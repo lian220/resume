@@ -10,6 +10,7 @@
 | [`lian-resume-star.md`](./lian-resume-star.md) | 동일 내용 마크다운 버전 |
 | [`lian-jira-summary.md`](./lian-jira-summary.md) | 작업 인벤토리 (내부 참조용) |
 | [`expert-panel-report.md`](./expert-panel-report.md) | 전문가 패널 5인 리뷰 통합 리포트 |
+| [`PROGRESS.md`](./PROGRESS.md) | **진행 일지** — 작업 히스토리 + 남은 빈칸 + 다음 액션 |
 
 ## STAR 4개 한눈에
 
