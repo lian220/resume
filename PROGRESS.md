@@ -1,7 +1,7 @@
 # 이력서 작업 진행 상황
 
 > 작업 시작: 2026-05-24
-> 최종 업데이트: 2026-05-31
+> 최종 업데이트: 2026-06-01
 > 목적: Lian (임도영) 백엔드 시니어 이력서 STAR 4개 + 면접 대비
 
 ---
@@ -49,6 +49,23 @@
 - **GitHub repo 생성·push**: https://github.com/lian220/resume
 - `PROGRESS.md` 작성 (현재 — 진행 일지)
 
+### 2026-06-01 — STAR 1 RBAC 실제 코드 기반 풀 리라이트
+- **`caribbean-api`(외식UP ROS 본부 백엔드) RBAC 구현을 코드로 전수 파악** (admin/api/auth/headquarter-api/share 모듈)
+- STAR 1 Action ③(운영자 RBAC)를 **실제 아키텍처로 풀 리라이트** — `.md` + `.html` 동기화
+  - 3단 권한 모델(ROOT/FUNCTION/ENDPOINT), 와일드카드 계층 매칭(`PermissionUtils.matchesPermission`)
+  - 함수레벨+객체레벨 이중 인가(`CustomPermissionEvaluator`/`TargetRosUserPermissionLevelEvaluator`) — IDOR·수직 권한 상승 차단
+  - 응답 PII 마스킹 AOP(`@MaskIfNoPermission`/`DtoMaskingAspect`, `010-****-5678`)
+  - 헤더 기반 RBAC 전파(`RbacHeaderInjectingFilter` → `X-*-Permissions`, JWT 직접 파싱 컨버터 `@Deprecated`)
+  - Redis 캐시 TTL **실측 확정**: permissionByRole 1분 / 토큰 RBAC 캐시 10분(SHA-256 키)
+- **빈칸 2건 해소**: Redis 캐시 TTL, 권한 변경 후 BO 반영 시간
+- **정직성 정정**: 이력서의 "JTI 블랙리스트"는 caribbean-api 코드에 테이블 없음 → 앱측(JTI, 별도 레포 추정) / BO측(DB 폐기+캐시 무효화)으로 **경로 분리 서술**
+- 면접 Q&A 6개 추가(IDOR/3단 모델/헤더 전파/응답 마스킹/TTL 등)
+- **`caribbean-api-gateway`(Spring Cloud Gateway) 파악·반영**: 중앙 RBAC 집행 관문
+  - `RbacAuthorizationFilter` → Auth `/rbac/permissions` 토큰 해석(Redis 10분 캐시) + `ENDPOINT_{METHOD}:{PATH}` `AntPathMatcher` 중앙 인가 + 화이트리스트(`SecurityWhitelist`)
+  - 14종 `X-*` 헤더 주입 + `X-Gateway-Header` 신뢰 마커, 클라 권한 헤더 권위 값 덮어쓰기(위조 차단), 6개 서비스 라우팅
+  - "헤더 기반 RBAC 전파" 항목을 **게이트웨이 중앙 집행** 아키텍처로 격상, Q&A 2개 추가
+- 면접 Q&A 총 8개 추가(STAR 1)
+
 ---
 
 ## 📊 현재 STAR 구성
@@ -65,7 +82,10 @@
 ## ✅ 확정된 핵심 수치/사실
 
 - 소셜 로그인 도입 후 **신규 가입자 일 10명 → 150명 (15배 / +1,400%)**
-- RBAC 캐시 = **Redis 분산 캐시**
+- RBAC 캐시 = **Redis 분산 캐시** (permissionByRole 1분 / 토큰 RBAC 캐시 SHA-256 키 10분)
+- RBAC 권한 모델 = **3단(ROOT/FUNCTION/ENDPOINT)** + 역할 6종(`SFN_ROOT·SUPER_ADMIN·BRAND_MANAGER·SUPERVISOR·STORE_OWNER·STORE_STAFF`) + `role_priority` 계층
+- RBAC 인가 = **함수레벨 + 객체레벨 이중**(`CustomPermissionEvaluator`+`DomainPermissionEvaluator`), 응답 PII 마스킹 AOP(`@MaskIfNoPermission`), 헤더 기반 전파(`X-*-Permissions`)
+- 강제 무효화 = **앱측 JTI 블랙리스트 / BO측 `oauth2_authorization` DB 폐기 + 캐시 무효화**(경로 분리) — caribbean-api엔 JTI 블랙리스트 테이블 없음(BO 경로만 존재)
 - PG = **토스페이먼츠 빌링 API (빌링키 기반)**
 - SigNoz 도입 단계: **팀/전사 표준 정착**
 - SigNoz 인프라: **EC2 단독 + docker-compose**
@@ -76,10 +96,10 @@
 ## ⏳ 남은 빈칸 (본인만 채울 수 있는 수치)
 
 ### STAR 1 (인증·인가)
-- [ ] Redis 캐시 TTL (몇 분?)
+- [x] ~~Redis 캐시 TTL~~ → **permissionByRole 1분 / 토큰 RBAC 캐시 10분** (caribbean-api 코드 검증) ✅
 - [ ] 정회원 전환율 (출시 전 대비)
 - [ ] QA 안정화 건수
-- [ ] 권한 변경 후 BO 반영 시간 개선 수치
+- [x] ~~권한 변경 후 BO 반영 시간~~ → **TTL 자연만료 최대 1분 / 무효화 API 즉시(0초)** ✅
 
 ### STAR 2 (SigNoz)
 - [ ] Datadog/New Relic 예상 연 비용 vs EC2 운영비

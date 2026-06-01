@@ -46,20 +46,25 @@
 - **탈퇴 시 provider Deauthorization**: 자체 탈퇴 시 카카오·애플 SDK Deauthorization 호출로 좀비 매핑 방지, 외부 호출 실패 시 비동기 재시도 큐로 최종 일관성 확보
 - **공격 표면 축소(Attack Surface Reduction)**: 초기 분리했던 API 8건을 검토 단계에서 기존 API에 흡수 통합 — 노출 엔드포인트 수 감소로 보안·운영 복잡도 동시 절감
 
-**Action — ③ 운영자 RBAC (UR10)**
-- **Role - Permission - User 매핑 모델 설계** + Admin BO 화면 페어 구현
-- **권한 매핑 배치 API**: 대량 매핑 추가/삭제를 배치 엔드포인트로 분리 — 단건 반복 호출 대비 감사 로그(audit trail) 추적 용이
-- **권한 캐시 invalidation API (Redis 기반)**: **Redis 분산 캐시**(TTL [채워주세요: N분])로 권한 조회 성능 확보 — **멀티 인스턴스 환경에서도 단일 캐시 공유로 stale 문제 원천 차단**. 권한 변경 시 즉시 무효화하는 명시적 API 추가 → 운영자가 BO에서 권한 수정 직후 호출하면 모든 인스턴스에 즉시 반영.
+**Action — ③ 운영자 RBAC (외식UP ROS 본부 백오피스, UR10)**
+- **3단 권한 모델 설계 (Role - Permission - User)**: 권한을 `ROOT`(시스템 루트) / `FUNCTION`(평가식 기반, 예 `HQ.SUPER_ADMIN.UPDATE_ACCOUNT`) / `ENDPOINT`(`GET:/api/...` 패턴) 3종으로 타입화. 역할은 `SFN_ROOT · SUPER_ADMIN · BRAND_MANAGER · SUPERVISOR · STORE_OWNER · STORE_STAFF` 6종에 `role_priority`(낮을수록 상위) 계층을 부여하고, `ros_role_permission_mapping` / `ros_user_role_mapping`으로 역할↔권한↔유저를 N:M 연결.
+- **와일드카드 계층 권한 매칭**: `PERMISSION_*`(전체), `HQ.*`(본부 전체), `HQ.SUPER_ADMIN.READ`(단건)처럼 접두 와일드카드를 지원하는 `matchesPermission()` 구현 — 권한 폭증 없이 계층적 부여 가능.
+- **함수레벨 + 객체레벨 이중 인가 (OWASP API1/API3 · IDOR 방어)**: `@PreAuthorize("hasPermission(#rosUserId, 'TYPE_ROS_USER', 'UPDATE_ACCOUNT')")` 한 줄로 ① 호출자가 해당 **기능 권한**을 갖는지 + ② **수정 대상 유저의 역할까지 조회해 `HQ.{대상역할}.UPDATE_ACCOUNT` 권한이 있는지** 객체 단위로 재검증. → SUPERVISOR가 SUPER_ADMIN 계정을 수정·삭제·잠금해제할 수 없도록 **수직 권한 상승을 코드로 차단** (`CustomPermissionEvaluator` + 도메인별 `DomainPermissionEvaluator` 체인).
+- **응답 PII 마스킹 AOP**: `@MaskIfNoPermission(permission="ROOT.PHONE_NUMBER_READ", maskType=PHONE_MIDDLE_PARTIAL)` 어노테이션 + 컨트롤러 응답을 가로채는 `DtoMaskingAspect` — 권한 없는 운영자에겐 전화번호를 `010-****-5678`로 자동 마스킹. 인가를 진입점뿐 아니라 **응답 직렬화 시점까지 다층 적용**.
+- **API 게이트웨이 중앙 RBAC 집행 + 헤더 기반 전파**: Spring Cloud Gateway(`RbacAuthorizationFilter`)를 **단일 인가 관문**으로 설계 — ① Auth 서버 `/rbac/permissions`로 토큰→권한을 1회 해석(결과 Redis 캐시, SHA-256 토큰 해시 키·TTL 10분) ② `ENDPOINT_{METHOD}:{PATH}` 권한을 `AntPathMatcher`로 **중앙 엔드포인트 인가**(+화이트리스트로 공개 엔드포인트 허용) ③ 검증된 권한을 `X-Hq-Roles · X-User-Roles · X-Function-Permissions · X-Endpoint-Permissions · X-Ros-Permissions` 헤더로 주입하고 **`X-Gateway-Header` 신뢰 마커** 부착 → 다운스트림 6개 서비스(auth·shop·hq·notes·admin)는 JWT 재파싱 없이 게이트웨이가 검증한 헤더만 신뢰. **클라이언트가 보낸 권한 헤더는 게이트웨이가 권위 값으로 덮어써 위조 차단**, 다운스트림은 `X-Gateway-Header` 유무로 게이트웨이 경유 여부 판별(미경유 시 자체 `RbacHeaderInjectingFilter` fallback). 기존 JWT 직접 파싱 컨버터는 `@Deprecated`로 전환해 권한 해석 책임을 게이트웨이로 단일화.
+- **Redis 분산 권한 캐시 + 명시적 무효화 API**: 역할→권한 조회 캐시(`permissionByRole`, **TTL 1분**)와 토큰→RBAC 응답 캐시(**SHA-256 토큰 해시 키, TTL 10분**)를 Redis로 운영 — **멀티 인스턴스에서도 단일 캐시 공유로 노드별 stale 원천 차단**. 역할 부여 시 `@CacheEvict` 자동 무효화 + 운영자가 BO에서 권한 수정 직후 호출하는 전체 무효화 API 제공 → 최대 1분(TTL 자연만료) 대기 없이 즉시 반영.
+- **권한 매핑 배치 + 감사 추적**: 대량 매핑 추가/삭제를 배치 엔드포인트로 분리(단건 반복 호출 대비 audit 용이), 권한 삭제 시 `ros_permission_deleted`에 JSONB 스냅샷을 백업해 audit trail 보존.
+- **강제 무효화 (BO측 경로)**: 계정 정지·권한 박탈 시 `oauth2_authorization` 레코드 폐기 + Redis 권한 캐시 무효화로 즉시 차단 — 앱측 JTI 블랙리스트와 구분된 **BO 전용 무효화 경로**.
 
 **Result**
 - **신규 가입자 일평균 10명 → 150명 (15배 / +1,400%)** — 소셜 로그인 도입으로 기존 ID/PW 6단계 가입 흐름을 3단계로 단축, 모바일 가입 마찰의 가장 큰 병목을 제거.
 - 정회원 전환율 [채워주세요: 출시 전 대비 N% 개선 또는 절대 수치].
 - QA 이슈 약 [채워주세요: N건] 출시 후 안정화, 이후 인증 관련 운영 장애 0건.
 - API 8건 통합 결정으로 노출 엔드포인트 수 감소 — 공격 표면 축소 + 신규 입사자 인증 도메인 온보딩 시간 단축.
-- ROS RBAC 19/22건 완료, 권한 변경 후 BO 반영 [채워주세요: N분 → 즉시].
+- ROS RBAC 19/22건 완료, 권한 변경 후 BO 반영: 캐시 TTL 자연만료 시 최대 1분 → **무효화 API 호출 시 즉시(0초) 전 인스턴스 반영**.
 - 두 서비스에 **"역할 + 명시적 권한 모델 + 캐시·세션 무효화 책임"** 동일 원칙 적용 — 인증·인가 일관성 확보.
 
-**키워드**: `OAuth 2.0 / OAuth 2.1 (PKCE S256)` · `Apple Sign-In (ES256, JWKS, cache-miss-on-validation-failure)` · `Kakao Login` · `Spring Authorization Server` · `자체 JWT + Refresh Token Rotation (RTR)` · `JTI 블랙리스트 (Redis TTL)` · `역할 기반 JWT (ROLE_*)` · `계정 상태 머신 (enum)` · `Account Linking (409 합류 스펙)` · `Provider Deauthorization` · `RBAC (Role-Permission-User)` · `Redis 분산 권한 캐시 + invalidation API` · `Attack Surface Reduction` · `Rate Limiting` · `OWASP API3 이중 권한 검증` · `Observability` · `System Architecture`
+**키워드**: `OAuth 2.0 / OAuth 2.1 (PKCE S256)` · `Apple Sign-In (ES256, JWKS, cache-miss-on-validation-failure)` · `Kakao Login` · `Spring Authorization Server` · `자체 JWT + Refresh Token Rotation (RTR)` · `JTI 블랙리스트 (Redis TTL)` · `역할 기반 JWT (ROLE_*)` · `계정 상태 머신 (enum)` · `Account Linking (409 합류 스펙)` · `Provider Deauthorization` · `RBAC (Role-Permission-User)` · `3단 권한 모델 (ROOT/FUNCTION/ENDPOINT)` · `와일드카드 계층 권한 매칭` · `객체레벨 인가 (CustomPermissionEvaluator)` · `응답 PII 마스킹 AOP (@MaskIfNoPermission)` · `API 게이트웨이 중앙 RBAC 집행 (Spring Cloud Gateway)` · `엔드포인트 인가 (AntPathMatcher + 화이트리스트)` · `헤더 기반 RBAC 전파 (X-*-Permissions, X-Gateway-Header 신뢰 마커)` · `Redis 분산 권한 캐시 (permissionByRole 1m / token 10m) + invalidation API` · `Attack Surface Reduction` · `Rate Limiting` · `OWASP API1/API3 이중 권한 검증` · `Observability` · `System Architecture`
 
 ---
 
@@ -196,10 +201,10 @@
 ### STAR 1 (최우선)
 - [x] ~~소셜 로그인 가입 비율~~ → **일 10명 → 150명 (15배)** ✅
 - [x] ~~RBAC 캐시 구현체~~ → **Redis 분산 캐시** ✅
-- [ ] Redis 캐시 TTL (몇 분?)
+- [x] ~~Redis 캐시 TTL~~ → **permissionByRole 1분 / 토큰 RBAC 캐시 10분** (코드 검증, caribbean-api) ✅
 - [ ] 정회원 전환율 (출시 전 대비)
 - [ ] QA 안정화 건수
-- [ ] 권한 변경 후 BO 반영 시간 개선 수치
+- [x] ~~권한 변경 후 BO 반영 시간~~ → **TTL 자연만료 최대 1분 / 무효화 API 호출 시 즉시(0초)** (코드 검증) ✅
 
 ### STAR 2
 - [ ] Datadog/New Relic 예상 연 비용 vs EC2 운영비
@@ -240,7 +245,14 @@
 | 1 | RTR vs 슬라이딩 갱신 차이는? | RTR = 1회용 refresh + 구 토큰 재사용 시 세션 전체 무효화. 슬라이딩은 단순 연장 |
 | 1 | Apple `client_secret` 6개월 만료 시 어떻게? | N일 전 자동 재생성 스케줄, AWS Parameter Store에서 .p8 키 관리 |
 | 1 | JWKS 캐시 24h인데 Apple 긴급 키 회전 시? | cache-miss-on-validation-failure fallback — 검증 실패 시 즉시 재조회 |
-| 1 | 권한 플래그 JWT에 넣으면 stale 문제는? | FE UI 분기 전용, 서버는 DB/캐시 이중 검증(OWASP API3), 강제 무효화는 JTI 블랙리스트 |
+| 1 | 권한 플래그 JWT에 넣으면 stale 문제는? | FE UI 분기 전용, 서버는 DB/캐시 이중 검증(OWASP API3). 강제 무효화는 **앱측=JTI 블랙리스트(Redis TTL)** / **BO측=`oauth2_authorization` DB 폐기 + Redis 권한 캐시 무효화**로 경로 분리 |
+| 1 | 기능 권한만 검사하면 IDOR 안 생기나? | 안 생기게 객체레벨까지 검사. `@PreAuthorize(hasPermission(#대상유저, ...))`로 **대상 유저의 역할을 조회해 `HQ.{대상역할}.UPDATE_ACCOUNT` 보유 여부 재검증** → SUPERVISOR가 SUPER_ADMIN 못 건드림(수직 권한 상승 차단) |
+| 1 | 권한 모델을 왜 3단(ROOT/FUNCTION/ENDPOINT)으로? | ROOT=시스템 루트, FUNCTION=평가식 기반 비즈니스 권한, ENDPOINT=URL 패턴 권한. 와일드카드(`HQ.*`) 계층 매칭으로 권한 폭증 없이 부여 |
+| 1 | 다운스트림 서비스마다 JWT 재파싱? | 아니오. 필터가 1회 해석 → `X-*-Permissions` 헤더 주입, 하위 서비스는 헤더만 신뢰. JWT 직접 파싱 컨버터는 `@Deprecated`로 전환 — 권한 해석 단일화 |
+| 1 | 응답에 민감정보(전화번호) 권한 통제는? | `@MaskIfNoPermission` + `DtoMaskingAspect`로 응답 직렬화 시점에 권한 없으면 `010-****-5678` 자동 마스킹 — 인가를 진입점+응답까지 다층 |
+| 1 | 권한 캐시 TTL을 왜 1분/10분으로 다르게? | 역할→권한 조회 캐시는 1분(신선도 우선), 토큰→RBAC 응답 캐시는 SHA-256 키 10분(중복 검증 비용 절감). 즉시성이 필요하면 무효화 API로 보강 |
+| 1 | 인가를 왜 게이트웨이에서 중앙 집행? | 서비스마다 토큰 검증·권한 해석 중복 제거. Auth 서버가 토큰 검증 권위, 게이트웨이가 권한 1회 해석+캐시+엔드포인트 인가 → 다운스트림은 헤더만 신뢰. 권한 모델 변경 시 게이트웨이 한 곳만 수정 |
+| 1 | 다운스트림이 헤더만 믿으면 클라이언트가 위조하면? | 게이트웨이가 토큰 검증 후 모든 권한 헤더를 **권위 값으로 덮어씀**(클라 입력 무시) + `X-Gateway-Header` 마커 부착. 다운스트림은 마커로 게이트웨이 경유를 확인 (게이트웨이 우회 직접 호출은 네트워크/SG 레벨에서 차단 전제) |
 | 1 | 계정 합류 409 응답에 민감 정보 노출은? | 합류 후보에 매장명·마스킹된 ID만 포함, 이메일·전화번호 비노출 |
 | 1 | RBAC 캐시 — 수평 확장 시 다른 노드는? | **Redis 분산 캐시**로 모든 인스턴스가 단일 캐시 공유. invalidation API 호출 시 즉시 반영 (브로드캐스트 불필요) |
 | 1 | 왜 in-memory(Caffeine) 대신 Redis를 택했나? | 멀티 인스턴스 환경에서 in-memory는 노드별 stale 발생 → invalidation 전파 복잡도. Redis는 단일 진실 원천으로 단순·안전 |

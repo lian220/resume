@@ -591,11 +591,16 @@
       <li><strong>공격 표면 축소(Attack Surface Reduction)</strong>: 초기 분리했던 API 8건을 검토 단계에서 기존 API에 흡수 통합 — 노출 엔드포인트 수 감소로 보안·운영 복잡도 동시 절감</li>
     </ul>
 
-    <div class="section-title action">Action ③ 운영자 RBAC</div>
+    <div class="section-title action">Action ③ 운영자 RBAC (외식UP ROS 본부 백오피스, UR10)</div>
     <ul>
-      <li><strong>Role - Permission - User 매핑 모델 설계</strong> + Admin BO 화면 페어 구현</li>
-      <li><strong>권한 매핑 배치 API</strong>: 대량 매핑 추가/삭제를 배치 엔드포인트로 분리 — 단건 반복 호출 대비 감사 로그(audit trail) 추적 용이</li>
-      <li><strong>권한 캐시 invalidation API (Redis 기반)</strong>: <strong>Redis 분산 캐시</strong>(TTL <span class="fillme">N분</span>)로 권한 조회 성능 확보 — <strong>멀티 인스턴스 환경에서도 단일 캐시 공유로 stale 문제 원천 차단</strong>. 권한 변경 시 즉시 무효화하는 명시적 API → 운영자가 BO에서 권한 수정 직후 호출하면 모든 인스턴스에 즉시 반영.</li>
+      <li><strong>3단 권한 모델 (Role - Permission - User)</strong>: 권한을 <code>ROOT</code>(시스템 루트) / <code>FUNCTION</code>(평가식, 예 <code>HQ.SUPER_ADMIN.UPDATE_ACCOUNT</code>) / <code>ENDPOINT</code>(<code>GET:/api/...</code> 패턴) 3종으로 타입화. 역할 6종(<code>SFN_ROOT · SUPER_ADMIN · BRAND_MANAGER · SUPERVISOR · STORE_OWNER · STORE_STAFF</code>)에 <code>role_priority</code> 계층 부여, <code>ros_role_permission_mapping</code>/<code>ros_user_role_mapping</code>으로 N:M 연결.</li>
+      <li><strong>와일드카드 계층 권한 매칭</strong>: <code>PERMISSION_*</code>(전체) · <code>HQ.*</code>(본부 전체) · <code>HQ.SUPER_ADMIN.READ</code>(단건) 접두 와일드카드를 지원하는 <code>matchesPermission()</code> — 권한 폭증 없이 계층적 부여.</li>
+      <li><strong>함수레벨 + 객체레벨 이중 인가 (OWASP API1/API3 · IDOR 방어)</strong>: <code>@PreAuthorize("hasPermission(#rosUserId, 'TYPE_ROS_USER', 'UPDATE_ACCOUNT')")</code> 한 줄로 ① 호출자의 기능 권한 + ② <strong>수정 대상 유저의 역할까지 조회해 <code>HQ.{대상역할}.UPDATE_ACCOUNT</code> 보유 여부를 객체 단위로 재검증</strong> → SUPERVISOR가 SUPER_ADMIN 계정을 수정·삭제·잠금해제 못 하도록 <strong>수직 권한 상승을 코드로 차단</strong> (<code>CustomPermissionEvaluator</code> + 도메인별 <code>DomainPermissionEvaluator</code> 체인).</li>
+      <li><strong>응답 PII 마스킹 AOP</strong>: <code>@MaskIfNoPermission(permission="ROOT.PHONE_NUMBER_READ", maskType=PHONE_MIDDLE_PARTIAL)</code> + 컨트롤러 응답을 가로채는 <code>DtoMaskingAspect</code> — 권한 없는 운영자에겐 전화번호를 <code>010-****-5678</code>로 자동 마스킹. <strong>인가를 진입점뿐 아니라 응답 직렬화 시점까지 다층 적용</strong>.</li>
+      <li><strong>API 게이트웨이 중앙 RBAC 집행 + 헤더 기반 전파</strong>: Spring Cloud Gateway(<code>RbacAuthorizationFilter</code>)를 <strong>단일 인가 관문</strong>으로 설계 — ① Auth 서버 <code>/rbac/permissions</code>로 토큰→권한 1회 해석(Redis 캐시, SHA-256 토큰 해시 키·TTL 10분) ② <code>ENDPOINT_{METHOD}:{PATH}</code> 권한을 <code>AntPathMatcher</code>로 <strong>중앙 엔드포인트 인가</strong>(+화이트리스트로 공개 엔드포인트 허용) ③ 검증된 권한을 <code>X-Hq-Roles · X-User-Roles · X-Function-Permissions · X-Endpoint-Permissions · X-Ros-Permissions</code> 헤더로 주입 + <strong><code>X-Gateway-Header</code> 신뢰 마커</strong> 부착 → 다운스트림 6개 서비스(auth·shop·hq·notes·admin)는 JWT 재파싱 없이 게이트웨이가 검증한 헤더만 신뢰. <strong>클라이언트가 보낸 권한 헤더는 게이트웨이가 권위 값으로 덮어써 위조 차단</strong>, 다운스트림은 <code>X-Gateway-Header</code> 유무로 경유 판별(미경유 시 자체 <code>RbacHeaderInjectingFilter</code> fallback). 기존 JWT 직접 파싱 컨버터는 <code>@Deprecated</code> 전환해 권한 해석 책임을 게이트웨이로 단일화.</li>
+      <li><strong>Redis 분산 권한 캐시 + 명시적 무효화 API</strong>: 역할→권한 캐시(<code>permissionByRole</code>, <strong>TTL 1분</strong>) + 토큰→RBAC 응답 캐시(<strong>SHA-256 토큰 해시 키, TTL 10분</strong>)를 Redis로 운영 — <strong>멀티 인스턴스에서도 단일 캐시 공유로 노드별 stale 원천 차단</strong>. 역할 부여 시 <code>@CacheEvict</code> 자동 무효화 + BO에서 권한 수정 직후 호출하는 전체 무효화 API → 최대 1분 TTL 대기 없이 즉시 반영.</li>
+      <li><strong>권한 매핑 배치 + 감사 추적</strong>: 대량 매핑 추가/삭제 배치 엔드포인트, 권한 삭제 시 <code>ros_permission_deleted</code>에 JSONB 스냅샷 백업으로 audit trail 보존.</li>
+      <li><strong>강제 무효화 (BO측 경로)</strong>: 계정 정지·권한 박탈 시 <code>oauth2_authorization</code> 레코드 폐기 + Redis 권한 캐시 무효화로 즉시 차단 — 앱측 JTI 블랙리스트와 구분된 BO 전용 경로.</li>
     </ul>
 
     <div class="section-title">Result</div>
@@ -604,7 +609,7 @@
       <li>정회원 전환율 <span class="fillme">출시 전 대비 N% 개선</span>.</li>
       <li>QA 이슈 약 <span class="fillme">N건</span> 출시 후 안정화, 이후 인증 관련 운영 장애 0건.</li>
       <li>API 8건 통합 결정으로 노출 엔드포인트 수 감소 — 공격 표면 축소 + 신규 입사자 인증 도메인 온보딩 시간 단축.</li>
-      <li>ROS RBAC 19/22건 완료, 권한 변경 후 BO 반영 <span class="fillme">N분 → 즉시</span>.</li>
+      <li>ROS RBAC 19/22건 완료, 권한 변경 후 BO 반영: 캐시 TTL 자연만료 시 최대 1분 → <strong>무효화 API 호출 시 즉시(0초) 전 인스턴스 반영</strong>.</li>
       <li>두 서비스에 <strong>"역할 + 명시적 권한 모델 + 캐시·세션 무효화 책임"</strong> 동일 원칙 적용 — 인증·인가 일관성 확보.</li>
     </ul>
 
@@ -622,7 +627,14 @@
         <span class="chip">Account Linking (409 합류 스펙)</span>
         <span class="chip">Provider Deauthorization</span>
         <span class="chip">RBAC (Role-Permission-User)</span>
-        <span class="chip">Redis 분산 권한 캐시 + invalidation</span>
+        <span class="chip">3단 권한 모델 (ROOT/FUNCTION/ENDPOINT)</span>
+        <span class="chip">와일드카드 계층 권한 매칭</span>
+        <span class="chip">객체레벨 인가 (CustomPermissionEvaluator)</span>
+        <span class="chip">응답 PII 마스킹 AOP (@MaskIfNoPermission)</span>
+        <span class="chip">API 게이트웨이 중앙 RBAC 집행 (Spring Cloud Gateway)</span>
+        <span class="chip">엔드포인트 인가 (AntPathMatcher + 화이트리스트)</span>
+        <span class="chip">헤더 기반 RBAC 전파 (X-*-Permissions, X-Gateway-Header)</span>
+        <span class="chip">Redis 분산 권한 캐시 (1m/10m) + invalidation</span>
         <span class="chip">Attack Surface Reduction</span>
         <span class="chip">Rate Limiting</span>
         <span class="chip">OWASP API3 이중 권한 검증</span>
@@ -934,7 +946,14 @@
         <tr><td><span class="starnum s1">1</span></td><td>RTR vs 슬라이딩 갱신 차이는?</td><td>RTR = 1회용 refresh + 구 토큰 재사용 시 세션 전체 무효화. 슬라이딩은 단순 연장</td></tr>
         <tr><td><span class="starnum s1">1</span></td><td>Apple <code>client_secret</code> 6개월 만료 시 어떻게?</td><td>N일 전 자동 재생성 스케줄, AWS Parameter Store에서 .p8 키 관리</td></tr>
         <tr><td><span class="starnum s1">1</span></td><td>JWKS 캐시인데 Apple 긴급 키 회전 시?</td><td>cache-miss-on-validation-failure fallback — 검증 실패 시 즉시 재조회</td></tr>
-        <tr><td><span class="starnum s1">1</span></td><td>권한 플래그 JWT에 넣으면 stale 문제는?</td><td>FE UI 분기 전용, 서버는 DB/캐시 이중 검증(OWASP API3), 강제 무효화는 JTI 블랙리스트</td></tr>
+        <tr><td><span class="starnum s1">1</span></td><td>권한 플래그 JWT에 넣으면 stale 문제는?</td><td>FE UI 분기 전용, 서버는 DB/캐시 이중 검증(OWASP API3). 강제 무효화는 <strong>앱측=JTI 블랙리스트(Redis TTL)</strong> / <strong>BO측=<code>oauth2_authorization</code> DB 폐기 + Redis 권한 캐시 무효화</strong>로 경로 분리</td></tr>
+        <tr><td><span class="starnum s1">1</span></td><td>기능 권한만 검사하면 IDOR 안 생기나?</td><td>객체레벨까지 검사. <code>@PreAuthorize(hasPermission(#대상유저, ...))</code>로 <strong>대상 유저 역할을 조회해 <code>HQ.{대상역할}.UPDATE_ACCOUNT</code> 보유 재검증</strong> → SUPERVISOR가 SUPER_ADMIN 못 건드림(수직 권한 상승 차단)</td></tr>
+        <tr><td><span class="starnum s1">1</span></td><td>권한 모델을 왜 3단(ROOT/FUNCTION/ENDPOINT)으로?</td><td>ROOT=시스템 루트, FUNCTION=평가식 비즈니스 권한, ENDPOINT=URL 패턴 권한. 와일드카드(<code>HQ.*</code>) 계층 매칭으로 권한 폭증 없이 부여</td></tr>
+        <tr><td><span class="starnum s1">1</span></td><td>다운스트림 서비스마다 JWT 재파싱?</td><td>아니오. 필터가 1회 해석 → <code>X-*-Permissions</code> 헤더 주입, 하위 서비스는 헤더만 신뢰. JWT 직접 파싱 컨버터는 <code>@Deprecated</code> 전환 — 권한 해석 단일화</td></tr>
+        <tr><td><span class="starnum s1">1</span></td><td>응답에 민감정보(전화번호) 권한 통제는?</td><td><code>@MaskIfNoPermission</code> + <code>DtoMaskingAspect</code>로 응답 직렬화 시점에 권한 없으면 <code>010-****-5678</code> 자동 마스킹 — 인가를 진입점+응답까지 다층</td></tr>
+        <tr><td><span class="starnum s1">1</span></td><td>권한 캐시 TTL을 왜 1분/10분으로 다르게?</td><td>역할→권한 조회 캐시는 1분(신선도 우선), 토큰→RBAC 응답 캐시는 SHA-256 키 10분(중복 검증 비용 절감). 즉시성 필요 시 무효화 API로 보강</td></tr>
+        <tr><td><span class="starnum s1">1</span></td><td>인가를 왜 게이트웨이에서 중앙 집행?</td><td>서비스마다 토큰 검증·권한 해석 중복 제거. Auth 서버가 토큰 검증 권위, 게이트웨이가 권한 1회 해석+캐시+엔드포인트 인가 → 다운스트림은 헤더만 신뢰. 권한 모델 변경 시 게이트웨이 한 곳만 수정</td></tr>
+        <tr><td><span class="starnum s1">1</span></td><td>다운스트림이 헤더만 믿으면 클라이언트가 위조하면?</td><td>게이트웨이가 토큰 검증 후 모든 권한 헤더를 <strong>권위 값으로 덮어씀</strong>(클라 입력 무시) + <code>X-Gateway-Header</code> 마커 부착. 다운스트림은 마커로 게이트웨이 경유 확인 (게이트웨이 우회 직접 호출은 네트워크/SG 레벨 차단 전제)</td></tr>
         <tr><td><span class="starnum s1">1</span></td><td>계정 합류 409 응답에 민감 정보 노출은?</td><td>합류 후보에 매장명·마스킹된 ID만 포함, 이메일·전화번호 비노출</td></tr>
         <tr><td><span class="starnum s1">1</span></td><td>RBAC 캐시 — 수평 확장 시 다른 노드는?</td><td><strong>Redis 분산 캐시</strong>로 모든 인스턴스가 단일 캐시 공유. invalidation API 호출 시 즉시 반영 (브로드캐스트 불필요)</td></tr>
         <tr><td><span class="starnum s1">1</span></td><td>왜 in-memory(Caffeine) 대신 Redis를 택했나?</td><td>멀티 인스턴스에서 in-memory는 노드별 stale 발생 → invalidation 전파 복잡도. Redis는 단일 진실 원천으로 단순·안전</td></tr>
