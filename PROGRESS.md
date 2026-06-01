@@ -65,6 +65,7 @@
   - 14종 `X-*` 헤더 주입 + `X-Gateway-Header` 신뢰 마커, 클라 권한 헤더 권위 값 덮어쓰기(위조 차단), 6개 서비스 라우팅
   - "헤더 기반 RBAC 전파" 항목을 **게이트웨이 중앙 집행** 아키텍처로 격상, Q&A 2개 추가
 - 면접 Q&A 총 8개 추가(STAR 1)
+- **빈칸 추가 해소**: QA 안정화 건수 → Jira 집계로 **소셜 로그인 본인 담당 버그 18건(17 배포완료)** 확정. 정회원 전환율 → cancun-api 회원 모델 파악 후 **조회 쿼리/BO API 확정**(수치는 DB/BO 실행 필요, 부록 참조)
 
 ---
 
@@ -97,8 +98,8 @@
 
 ### STAR 1 (인증·인가)
 - [x] ~~Redis 캐시 TTL~~ → **permissionByRole 1분 / 토큰 RBAC 캐시 10분** (caribbean-api 코드 검증) ✅
-- [ ] 정회원 전환율 (출시 전 대비)
-- [ ] QA 안정화 건수
+- [ ] 정회원 전환율 (출시 전 대비) — **쿼리 준비됨, 수치만 실행 필요** (cancun-api `MemberCountSummary.conversionRate` / BO API `GET /admin/users/count-summary` / 아래 SQL)
+- [x] ~~QA 안정화 건수~~ → **소셜 로그인 본인 담당 버그 18건 (17 배포완료/안정화)** — Jira `parent=CHABYULHWA-3296 AND issuetype=버그 AND assignee=Lian(임도영)` ✅
 - [x] ~~권한 변경 후 BO 반영 시간~~ → **TTL 자연만료 최대 1분 / 무효화 API 즉시(0초)** ✅
 
 ### STAR 2 (SigNoz)
@@ -137,6 +138,37 @@
 3. **이력서 본문(자기소개 + 경력 요약 + 기술 스택)** 작성 — STAR는 이력서의 한 섹션, 풀 이력서 필요
 4. **영문 이력서 / 링크드인 프로필 동기화**
 5. **STAR 5번째 후보 발굴** — Jira 인벤토리(`lian-jira-summary.md`)에서 다른 핵심 작업 추가 가능 여부 검토
+
+---
+
+## 📌 정회원 전환율 조회 방법 (cancun-api 기준, 2026-06-01 확인)
+
+> 앱이 이미 정의를 가지고 있음 — `MemberCountSummary.conversionRate = convertedFromPreCount / preRegistrationTotalCount × 100` (준회원 사전등록 중 정회원 전환 비율).
+> 모델: `pre_user_registration`(준회원 사전등록, 정회원 전환 시 `user`로 이관·유지) ↔ `user`(정회원, base_user_id 보유) ↔ `base_user`(role_type: TEMP_USER/SOCIAL_USER=준회원, USER=정회원).
+
+**방법 A (권장) — BO Admin API 호출** (`UserAdminController`):
+```
+GET /admin/users/count-summary?signUpProvider=KAKAO&signUpStartedAt=2025-XX-XX&signUpEndedAt=2025-XX-XX
+→ 응답 conversionRate 필드 그대로 사용 (provider·기간 필터 지원)
+```
+
+**방법 B — SQL 직접 (findMemberCountSummary 로직 그대로 옮김)**:
+```sql
+SELECT
+  SUM(u.base_user_id IS NOT NULL)                                  AS full_member,        -- 정회원
+  SUM(u.base_user_id IS NULL AND p.base_user_id IS NOT NULL)       AS pre_member,         -- 미전환 준회원
+  SUM(u.base_user_id IS NOT NULL AND p.base_user_id IS NOT NULL)   AS converted_from_pre, -- 준→정 전환
+  SUM(p.base_user_id IS NOT NULL)                                  AS pre_total,          -- 준회원 사전등록 총수
+  ROUND(100 * SUM(u.base_user_id IS NOT NULL AND p.base_user_id IS NOT NULL)
+            / NULLIF(SUM(p.base_user_id IS NOT NULL), 0), 2)       AS conversion_rate_pct
+FROM base_user b
+LEFT JOIN `user` u                ON u.base_user_id = b.id AND u.deleted_yn = 'N'
+LEFT JOIN pre_user_registration p ON p.base_user_id = b.id
+WHERE (u.base_user_id IS NULL OR u.status <> 'WITHDRAW');         -- 탈퇴 정회원 제외
+-- provider 코호트: JOIN social_user s ON s.base_user_id=b.id, WHERE s.origin_provider IN ('KAKAO','APPLE')
+-- 기간 코호트: AND b.created_at >= '2025-XX-01' AND b.created_at < '2025-YY-01'
+-- 주의: 앱 BO는 '그룹 흡수 준회원(account_group)'을 제외함 → BO API 값과 미세 차이 가능
+```
 
 ---
 
