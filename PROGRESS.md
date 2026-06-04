@@ -72,6 +72,20 @@
 - provider/기간 코호트 쿼리 버그 수정: provider는 `social_user_link`(base_user_id) 경유, 기간은 `pre_user_registration.created_at` 사용(`base_user`엔 created_at 없음) — 부록 갱신
 - **STAR 1 빈칸 전부 해소** (남은 빈칸: STAR 2/3/4 수치만)
 
+### 2026-06-04 — STAR 4 추천인코드 시스템 실코드 정밀화 + 전문가 리뷰
+- `cancun-api`(B2C 차별화상회) `feature/CHABYULHWA-4086` 추천인 멤버십 코드 **전수 분석** (저자 = 본인 lian ✅)
+- **STAR 4 ⑥ 풀 정밀화**(.md/.html): 2-트랙 해석기 / 추천 결정 엔진 / 체험 1회용 슬롯 / 쿨다운(생애1회·12개월) / 리워드 스냅샷 / 멱등 지급(조건부 UPDATE) / D+8 환불제외
+- **불일치 3건 정정**(정직성):
+  - "정액 1원 보정" → **0원 클램프**(PG가 1원 거부)
+  - "환불 시 리워드 회수" → **지급 전 환불=배치 제외 / 지급 후 환수 없음**(클로백 백로그)
+  - "idempotency=(memberId,rewardDate) DB유니크" → **조건부 UPDATE(PENDING→GRANTED) 선점**
+- **전문가 2인 리뷰**(백엔드 아키텍트 + 보안) + 사용자 정정 반영 → 4대 강점(멱등 선점/스냅샷/체험 슬롯/**실패 격리**) + 잔여 약점 2개(가짜피추천인Sybil·MIN(paidAt))
+  - ※ "추천인당 캡 없음=취약점"은 오프레이밍 → **정상 다수추천은 의도된 어필리에이트**(캡 X). 진짜 리스크는 가짜 피추천인 자가파밍 → fraud 휴리스틱+클로백
+  - ※ "재시도 상한 없음"은 **stale 커밋 기준 오판** → 현 작업본은 실패=`PENDING→FAILED` 종료 + Slack 알림 + BO 조회 + **운영자 멱등 수동 재처리**(이미 해결, 강점)
+  - ※ 클로백 없음 = 버그 아니라 **D+8·무환수 현 스코프 결정**(30일 클로백은 다채널 백로그)
+- **면접 노트 신규 작성** → `STAR4-멤버십-추천인-면접노트.md` (외울 숫자·강점·약점·예상질문·정정사항)
+- STAR 4 Q&A 6건 정정/추가(.md/.html)
+
 ---
 
 ## 📊 현재 STAR 구성
@@ -204,6 +218,7 @@ GROUP BY DATE_FORMAT(p.created_at, '%Y-%m') ORDER BY pre_signup_month;
 | `lian-resume-star.html` | **이력서 STAR 4개 (브라우저용)** — 채용 담당자 공유용 |
 | `lian-resume-star.md` | 동일 내용 마크다운 버전 |
 | `lian-jira-summary.md` | 작업 인벤토리 (내부 참조용) |
+| `STAR4-멤버십-추천인-면접노트.md` | **STAR 4 추천인 시스템 면접 치트시트** (외울 숫자·강점·약점·예상질문) |
 | `expert-panel-report.md` | 전문가 패널 5인 리뷰 통합 |
 | `PROGRESS.md` | 이 파일 — 진행 일지 |
 | `README.md` | repo 소개 |
