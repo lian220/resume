@@ -67,6 +67,11 @@
 - 면접 Q&A 총 8개 추가(STAR 1)
 - **빈칸 추가 해소**: QA 안정화 건수 → Jira 집계로 **소셜 로그인 본인 담당 버그 18건(17 배포완료)** 확정. 정회원 전환율 → cancun-api 회원 모델 파악 후 **조회 쿼리/BO API 확정**(수치는 DB/BO 실행 필요, 부록 참조)
 
+### 2026-06-02 — 정회원 전환율 수치 확정
+- 사용자가 부록 SQL 실행 → **정회원 전환율 30.2%** (준회원 사전등록 9,723건 중 2,936건 전환) 확정, `.md`/`.html` 빈칸 채움
+- provider/기간 코호트 쿼리 버그 수정: provider는 `social_user_link`(base_user_id) 경유, 기간은 `pre_user_registration.created_at` 사용(`base_user`엔 created_at 없음) — 부록 갱신
+- **STAR 1 빈칸 전부 해소** (남은 빈칸: STAR 2/3/4 수치만)
+
 ---
 
 ## 📊 현재 STAR 구성
@@ -98,7 +103,7 @@
 
 ### STAR 1 (인증·인가)
 - [x] ~~Redis 캐시 TTL~~ → **permissionByRole 1분 / 토큰 RBAC 캐시 10분** (caribbean-api 코드 검증) ✅
-- [ ] 정회원 전환율 (출시 전 대비) — **쿼리 준비됨, 수치만 실행 필요** (cancun-api `MemberCountSummary.conversionRate` / BO API `GET /admin/users/count-summary` / 아래 SQL)
+- [x] ~~정회원 전환율~~ → **30.2%** (준회원 사전등록 9,723 중 2,936 전환, cancun-api SQL 실행 확정 / 부록 Q1) ✅
 - [x] ~~QA 안정화 건수~~ → **소셜 로그인 본인 담당 버그 18건 (17 배포완료/안정화)** — Jira `parent=CHABYULHWA-3296 AND issuetype=버그 AND assignee=Lian(임도영)` ✅
 - [x] ~~권한 변경 후 BO 반영 시간~~ → **TTL 자연만료 최대 1분 / 무효화 API 즉시(0초)** ✅
 
@@ -141,10 +146,13 @@
 
 ---
 
-## 📌 정회원 전환율 조회 방법 (cancun-api 기준, 2026-06-01 확인)
+## 📌 정회원 전환율 조회 방법 (cancun-api 기준, 2026-06-02 실행 확정)
 
-> 앱이 이미 정의를 가지고 있음 — `MemberCountSummary.conversionRate = convertedFromPreCount / preRegistrationTotalCount × 100` (준회원 사전등록 중 정회원 전환 비율).
-> 모델: `pre_user_registration`(준회원 사전등록, 정회원 전환 시 `user`로 이관·유지) ↔ `user`(정회원, base_user_id 보유) ↔ `base_user`(role_type: TEMP_USER/SOCIAL_USER=준회원, USER=정회원).
+> **결과(전체): 30.2%** — 정회원 47,877 / 미전환 준회원 6,787 / 준→정 전환 2,936 / 준회원 사전등록 총 9,723 → 전환율 = 2,936/9,723 = **30.20%**.
+> (참고: 정회원 47,877명 중 사전등록 funnel 경유는 2,936명뿐 — 나머지는 레거시/직가입. STAR 1은 신규 SNS 가입 funnel 지표이므로 9,723 기준 30.2%가 맞는 수치.)
+>
+> 앱 자체 정의 — `MemberCountSummary.conversionRate = convertedFromPreCount / preRegistrationTotalCount × 100`.
+> 모델: `pre_user_registration`(준회원 사전등록, 정회원 전환 시 `user`로 이관·유지) ↔ `user`(정회원, base_user_id 보유) ↔ `base_user`(role_type: TEMP_USER/SOCIAL_USER=준회원, USER=정회원). **주의: `base_user`엔 `created_at` 없음 — 기간 코호트는 `pre_user_registration.created_at` 사용.**
 
 **방법 A (권장) — BO Admin API 호출** (`UserAdminController`):
 ```
@@ -165,9 +173,26 @@ FROM base_user b
 LEFT JOIN `user` u                ON u.base_user_id = b.id AND u.deleted_yn = 'N'
 LEFT JOIN pre_user_registration p ON p.base_user_id = b.id
 WHERE (u.base_user_id IS NULL OR u.status <> 'WITHDRAW');         -- 탈퇴 정회원 제외
--- provider 코호트: JOIN social_user s ON s.base_user_id=b.id, WHERE s.origin_provider IN ('KAKAO','APPLE')
--- 기간 코호트: AND b.created_at >= '2025-XX-01' AND b.created_at < '2025-YY-01'
 -- 주의: 앱 BO는 '그룹 흡수 준회원(account_group)'을 제외함 → BO API 값과 미세 차이 가능
+```
+
+**provider 코호트 (수정판 — social_user엔 base_user_id 없음, link 테이블 경유)**:
+```sql
+LEFT JOIN social_user_link sl ON sl.base_user_id = b.id AND sl.active_yn = 'Y'
+LEFT JOIN social_user s       ON s.id = sl.social_user_id
+-- ... GROUP BY COALESCE(s.origin_provider, '일반(ID/PW)')   (social_user_id null = 일반/ID·PW)
+```
+
+**기간 코호트 (수정판 — base_user.created_at 없음, 준회원 등록일 사용)**:
+```sql
+SELECT DATE_FORMAT(p.created_at, '%Y-%m') AS pre_signup_month,
+       COUNT(*) AS pre_total,
+       SUM(u.base_user_id IS NOT NULL) AS converted,
+       ROUND(100 * SUM(u.base_user_id IS NOT NULL) / COUNT(*), 2) AS conversion_rate_pct
+FROM pre_user_registration p
+LEFT JOIN `user` u ON u.base_user_id = p.base_user_id AND u.deleted_yn = 'N'
+WHERE (u.base_user_id IS NULL OR u.status <> 'WITHDRAW')
+GROUP BY DATE_FORMAT(p.created_at, '%Y-%m') ORDER BY pre_signup_month;
 ```
 
 ---
