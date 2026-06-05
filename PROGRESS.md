@@ -219,6 +219,7 @@ GROUP BY DATE_FORMAT(p.created_at, '%Y-%m') ORDER BY pre_signup_month;
 | `lian-resume-star.md` | 동일 내용 마크다운 버전 |
 | `lian-jira-summary.md` | 작업 인벤토리 (내부 참조용) |
 | `STAR4-멤버십-추천인-면접노트.md` | **STAR 4 추천인 시스템 면접 치트시트** (외울 숫자·강점·약점·예상질문) |
+| `면접-AI트렌드-준비노트.md` | **AI 시대 기술면접 트렌드 + 행동면접 답변 스크립트** (글로벌·국내 사례, 형태별 준비, STAR 4 기반 스크립트 A/B/C) |
 | `expert-panel-report.md` | 전문가 패널 5인 리뷰 통합 |
 | `PROGRESS.md` | 이 파일 — 진행 일지 |
 | `README.md` | repo 소개 |
