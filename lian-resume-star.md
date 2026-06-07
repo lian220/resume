@@ -49,9 +49,9 @@
 **Action — ③ 운영자 RBAC (외식UP ROS 본부 백오피스, UR10)**
 - **3단 권한 모델 설계 (Role - Permission - User)**: 권한을 `ROOT`(시스템 루트) / `FUNCTION`(평가식 기반, 예 `HQ.SUPER_ADMIN.UPDATE_ACCOUNT`) / `ENDPOINT`(`GET:/api/...` 패턴) 3종으로 타입화. 역할은 `SFN_ROOT · SUPER_ADMIN · BRAND_MANAGER · SUPERVISOR · STORE_OWNER · STORE_STAFF` 6종에 `role_priority`(낮을수록 상위) 계층을 부여하고, `ros_role_permission_mapping` / `ros_user_role_mapping`으로 역할↔권한↔유저를 N:M 연결.
 - **와일드카드 계층 권한 매칭**: `PERMISSION_*`(전체), `HQ.*`(본부 전체), `HQ.SUPER_ADMIN.READ`(단건)처럼 접두 와일드카드를 지원하는 `matchesPermission()` 구현 — 권한 폭증 없이 계층적 부여 가능.
-- **함수레벨 + 객체레벨 이중 인가 (OWASP API1/API3 · IDOR 방어)**: `@PreAuthorize("hasPermission(#rosUserId, 'TYPE_ROS_USER', 'UPDATE_ACCOUNT')")` 한 줄로 ① 호출자가 해당 **기능 권한**을 갖는지 + ② **수정 대상 유저의 역할까지 조회해 `HQ.{대상역할}.UPDATE_ACCOUNT` 권한이 있는지** 객체 단위로 재검증. → SUPERVISOR가 SUPER_ADMIN 계정을 수정·삭제·잠금해제할 수 없도록 **수직 권한 상승을 코드로 차단** (`CustomPermissionEvaluator` + 도메인별 `DomainPermissionEvaluator` 체인).
+- **함수레벨 + 객체레벨 이중 인가 (OWASP API1/API3 · IDOR 방어)**: `@PreAuthorize("hasPermission(#rosUserId, 'TYPE_ROS_USER', 'UPDATE_ACCOUNT')")` 한 줄로 ① 호출자가 해당 **기능 권한**을 갖는지 + ② **수정 대상 유저의 역할까지 조회해 `HQ.{대상역할}.UPDATE_ACCOUNT` 권한이 있는지** 객체 단위로 재검증. → SUPERVISOR가 SUPER_ADMIN 계정을 수정·삭제·잠금해제할 수 없도록 **수직 권한 상승을 코드로 차단** (`CustomPermissionEvaluator` + 도메인별 `DomainPermissionEvaluator` 체인). 수평 테넌트 침범(다른 브랜드 객체 접근)은 `brandId`/`storeId` 스코프 일치로 별도 차단 `[확인: 코드상 테넌트 스코프 검증 위치]`. 목록 API는 행 단위 객체평가 대신 권한 조건을 쿼리로 내려 N+1 인가 회피 `[확인: 목록 권한 필터 방식]`.
 - **응답 PII 마스킹 AOP**: `@MaskIfNoPermission(permission="ROOT.PHONE_NUMBER_READ", maskType=PHONE_MIDDLE_PARTIAL)` 어노테이션 + 컨트롤러 응답을 가로채는 `DtoMaskingAspect` — 권한 없는 운영자에겐 전화번호를 `010-****-5678`로 자동 마스킹. 인가를 진입점뿐 아니라 **응답 직렬화 시점까지 다층 적용**.
-- **API 게이트웨이 중앙 RBAC 집행 + 헤더 기반 전파**: Spring Cloud Gateway(`RbacAuthorizationFilter`)를 **단일 인가 관문**으로 설계 — ① Auth 서버 `/rbac/permissions`로 토큰→권한을 1회 해석(결과 Redis 캐시, SHA-256 토큰 해시 키·TTL 10분) ② `ENDPOINT_{METHOD}:{PATH}` 권한을 `AntPathMatcher`로 **중앙 엔드포인트 인가**(+화이트리스트로 공개 엔드포인트 허용) ③ 검증된 권한을 `X-Hq-Roles · X-User-Roles · X-Function-Permissions · X-Endpoint-Permissions · X-Ros-Permissions` 헤더로 주입하고 **`X-Gateway-Header` 신뢰 마커** 부착 → 다운스트림 6개 서비스(auth·shop·hq·notes·admin)는 JWT 재파싱 없이 게이트웨이가 검증한 헤더만 신뢰. **클라이언트가 보낸 권한 헤더는 게이트웨이가 권위 값으로 덮어써 위조 차단**, 다운스트림은 `X-Gateway-Header` 유무로 게이트웨이 경유 여부 판별(미경유 시 자체 `RbacHeaderInjectingFilter` fallback). 기존 JWT 직접 파싱 컨버터는 `@Deprecated`로 전환해 권한 해석 책임을 게이트웨이로 단일화.
+- **API 게이트웨이 중앙 RBAC 집행 + 헤더 기반 전파**: Spring Cloud Gateway(`RbacAuthorizationFilter`)를 **단일 인가 관문**으로 설계 — ① Auth 서버 `/rbac/permissions`로 토큰→권한을 1회 해석(결과 Redis 캐시, SHA-256 토큰 해시 키·TTL 10분) ② `ENDPOINT_{METHOD}:{PATH}` 권한을 `AntPathMatcher`로 **중앙 엔드포인트 인가**(+화이트리스트로 공개 엔드포인트 허용) ③ 검증된 권한을 `X-Hq-Roles · X-User-Roles · X-Function-Permissions · X-Endpoint-Permissions · X-Ros-Permissions` 헤더로 주입하고 **`X-Gateway-Header` 신뢰 마커** 부착 → 다운스트림 6개 서비스(auth·shop·hq·notes·admin)는 JWT 재파싱 없이 게이트웨이가 검증한 헤더만 신뢰. **클라이언트가 보낸 권한 헤더는 게이트웨이가 권위 값으로 덮어써 위조 차단**, 다운스트림은 `X-Gateway-Header` 유무로 게이트웨이 경유 여부 판별(미경유 시 헤더를 불신하고 토큰을 자체 재검증하는 `RbacHeaderInjectingFilter` fallback `[확인: fallback이 토큰 자체 재검증인지]`). 다운스트림은 private subnet + SG로 게이트웨이에서만 접근 허용(네트워크 격리)하여 헤더 직접 위조 차단, 마커 서명 기반(HMAC/mTLS) 강화는 `[확인/백로그]`. 기존 JWT 직접 파싱 컨버터는 `@Deprecated`로 전환해 권한 해석 책임을 게이트웨이로 단일화 — 인가 단일 관문의 가용성은 게이트웨이 다중화 + auth `/rbac/permissions` 호출 서킷브레이커로 확보 `[확인]`.
 - **Redis 분산 권한 캐시 + 명시적 무효화 API**: 역할→권한 조회 캐시(`permissionByRole`, **TTL 1분**)와 토큰→RBAC 응답 캐시(**SHA-256 토큰 해시 키, TTL 10분**)를 Redis로 운영 — **멀티 인스턴스에서도 단일 캐시 공유로 노드별 stale 원천 차단**. 역할 부여 시 `@CacheEvict` 자동 무효화 + 운영자가 BO에서 권한 수정 직후 호출하는 전체 무효화 API 제공 → 최대 1분(TTL 자연만료) 대기 없이 즉시 반영.
 - **권한 매핑 배치 + 감사 추적**: 대량 매핑 추가/삭제를 배치 엔드포인트로 분리(단건 반복 호출 대비 audit 용이), 권한 삭제 시 `ros_permission_deleted`에 JSONB 스냅샷을 백업해 audit trail 보존.
 - **강제 무효화 (BO측 경로)**: 계정 정지·권한 박탈 시 `oauth2_authorization` 레코드 폐기 + Redis 권한 캐시 무효화로 즉시 차단 — 앱측 JTI 블랙리스트와 구분된 **BO 전용 무효화 경로**.
@@ -61,7 +61,7 @@
 - 준회원 사전등록 → **정회원 전환율 30.2%** (사전등록 9,723건 중 2,936건 전환).
 - 소셜 로그인 QA 버그 **18건 출시 후 안정화** (본인 담당, 17건 배포완료 — 카카오·애플 **계정 통합 / 준회원→정회원 전환 / 연동 해제** 엣지케이스 중심), 이후 인증 관련 운영 장애 0건.
 - API 8건 통합 결정으로 노출 엔드포인트 수 감소 — 공격 표면 축소 + 신규 입사자 인증 도메인 온보딩 시간 단축.
-- ROS RBAC 19/22건 완료, 권한 변경 후 BO 반영: 캐시 TTL 자연만료 시 최대 1분 → **무효화 API 호출 시 즉시(0초) 전 인스턴스 반영**.
+- ROS RBAC 19/22건 완료, 권한 변경 후 BO 반영: 캐시 TTL 자연만료 시 최대 1분 → **무효화 API 호출 시 즉시(0초) 전 인스턴스 반영**(역할 캐시 기준; 토큰 RBAC 캐시 10분은 유저→토큰해시 역인덱스로 함께 무효화 `[확인]`, 미적용 시 JTI 블랙리스트 교차 차단으로 보강).
 - 두 서비스에 **"역할 + 명시적 권한 모델 + 캐시·세션 무효화 책임"** 동일 원칙 적용 — 인증·인가 일관성 확보.
 
 **키워드**: `OAuth 2.0 / OAuth 2.1 (PKCE S256)` · `Apple Sign-In (ES256, JWKS, cache-miss-on-validation-failure)` · `Kakao Login` · `Spring Authorization Server` · `자체 JWT + Refresh Token Rotation (RTR)` · `JTI 블랙리스트 (Redis TTL)` · `역할 기반 JWT (ROLE_*)` · `계정 상태 머신 (enum)` · `Account Linking (409 합류 스펙)` · `Provider Deauthorization` · `RBAC (Role-Permission-User)` · `3단 권한 모델 (ROOT/FUNCTION/ENDPOINT)` · `와일드카드 계층 권한 매칭` · `객체레벨 인가 (CustomPermissionEvaluator)` · `응답 PII 마스킹 AOP (@MaskIfNoPermission)` · `API 게이트웨이 중앙 RBAC 집행 (Spring Cloud Gateway)` · `엔드포인트 인가 (AntPathMatcher + 화이트리스트)` · `헤더 기반 RBAC 전파 (X-*-Permissions, X-Gateway-Header 신뢰 마커)` · `Redis 분산 권한 캐시 (permissionByRole 1m / token 10m) + invalidation API` · `Attack Surface Reduction` · `Rate Limiting` · `OWASP API1/API3 이중 권한 검증` · `Observability` · `System Architecture`
@@ -86,6 +86,7 @@
 - **인프라 구축**: **EC2 단독 + docker-compose**로 배포. 팀 규모·트래픽 기준에서 단일 인스턴스로 충분했고, **관측성 도구 다운 ≠ 서비스 다운**이므로 HA 비용 대비 합리적 선택. 데이터 백업은 **EBS 스냅샷 일 1회 자동화**, 외부 노출은 [채워주세요: SG IP 제한 / VPN / 리버스 프록시 + Basic Auth] 로 차단. ClickHouse 보존 정책: 트레이스 [채워주세요: N일] / 메트릭 [채워주세요: N일] / 로그 [채워주세요: N일], TTL 정책으로 디스크 자동 관리.
 - **계측**: **OTel Java Agent**가 `GlobalOpenTelemetry`를 초기화하고 HTTP / JPA / 외부 호출 자동 계측. 핵심 비즈니스 흐름(OAuth 콜백, 결제 Calculator, 리워드 배치 등)에는 `@WithSpan` / `tracer.spanBuilder()`로 **커스텀 span 선별 추가** (비즈니스 핵심 흐름 [채워주세요: N개]에만 적용, span 폭증 방지). parent context 전파 확인 완료.
 - **운영화**: API별 에러율·P95 응답시간 대시보드 구성, **알람 임계값**: [채워주세요: P95 > Nms / 에러율 > N%] 기준 Slack 알림. traceId/spanId를 **Logback MDC에 주입**해 로그 → Trace 연관 조회 가능.
+- **분산 추적 일관성**: API 게이트웨이 경유 시 W3C `traceparent` 전파로 게이트웨이→다운스트림 6서비스 trace 연속성 확보 `[확인: 게이트웨이 trace 전파]`. 인가 단일 관문인 게이트웨이의 **인가 필터 P95(캐시 hit/miss 분리)** 와 **`/rbac/permissions` 의존성 성공률**, 공유 의존 **Redis(권한·세션·결제멱등성) 가용성**을 핵심 SLI로 관측 `[확인: 게이트웨이/Redis 대시보드 구성]`.
 - **팀 확산 & 표준화**: 도입 가이드 문서 [채워주세요: N페이지] 작성, 온보딩 세션 [채워주세요: N회] 진행. [채워주세요: N명] 팀원 자발 활용, [채워주세요: N개] 신규 서비스에 OTel Agent 적용이 디폴트 절차로 편입.
 
 **Result**
@@ -112,7 +113,7 @@
 - BE 단독으로 **본부향 + 점주향 + 관리자 Admin 3축**, **3종 컨텐츠**, **알림톡 / 1:1 문의 / 조회현황** 전 영역의 API 설계·구현. 후속 운영 성능 이슈도 동일 책임.
 
 **Action — ① 기반 설계 & 본부향 풀 CRUD**
-- **도메인 설계**: 3종 컨텐츠 + 1:1 문의 통합 모델 + 라이프사이클 정의
+- **도메인 설계**: 3종 컨텐츠 + 1:1 문의 통합 모델 + 라이프사이클 정의. 공통 라이프사이클을 공유하고 타입별 필드 발산이 작아 **STI(단일 테이블 상속, 폴리모픽 목록 조회 최적·타입별 nullable 수용)**로 모델링 `[확인: 상속 전략 STI/조인]`. 1:1 문의는 **Inquiry(aggregate root) 1:N Reply** 구조로 미답변 개수 집계 `[확인]`.
 - **본부향 CRUD**: 목록 / 상세 / 작성 / 수정 / 삭제 / **임시저장** / 공개·비공개 토글
 - **공문 확인 → 읽음 처리 변경**: 사용자 행동 분석 반영해 도메인 의미 재정의
 
@@ -122,7 +123,7 @@
 
 **Action — ③ 알림톡(Kakao AlimTalk) 연동**
 - 발송 API + 템플릿 조회 + 인사말 + 알림 현황·조회 현황 + 버튼 링크 기능
-- **발송 실패 시 재시도**: 외부 API 호출 실패 시 exponential backoff 재시도 + 상태 추적, DB 트랜잭션과 외부 호출의 경계를 분리해 **부분 실패 시에도 게시글 상태는 일관성 유지**
+- **발송 실패 시 재시도**: 외부 API 호출 실패 시 exponential backoff 재시도 + 상태 추적, DB 트랜잭션과 외부 호출의 경계를 분리해 **부분 실패 시에도 게시글 상태는 일관성 유지** — 게시글 커밋과 발송요청을 한 트랜잭션에 기록 후 별도 처리하는 **Transactional Outbox** 방식으로 dual-write 유실 방지 `[확인: Outbox 테이블 기반인지 단순 retry인지]`
 
 **Action — ④ 출시 후 운영 단계 성능 개선 (Performance Tuning)**
 - **쿼리 성능 튜닝**: 목록 / 상세 / 팝업 리스트 실행계획 분석 후 **N+1 제거**(쿼리 [채워주세요: N개 → M개] 감소) + **복합 인덱스 추가**([채워주세요: 대상 컬럼]) + Fetch Join/Batch Size 조정
@@ -168,7 +169,7 @@
 - **연체 → 자동 해지 전환**: 재시도 N회 모두 실패 시 자동 해지, 그 시점에 누적 멤버십 권한(STAR 1의 `canViewWholesalePrice`·`canOrder`) 즉시 회수
 
 **Action — ④ 환불·부분환불·무료체험**
-- **안분(일할) 환불**: 중도 해지 시 사용 일수 기반 일할 계산 — 미사용 잔여 일수만큼 부분 환불
+- **안분(일할) 환불**: 중도 해지 시 사용 일수 기반 일할 계산 — 미사용 잔여 일수만큼 부분 환불. 환불 중복 실행은 토스 Idempotency-Key + `누적 환불액 ≤ 결제액` 불변식으로 차단(결제 멱등성과 대칭) `[확인: 환불 멱등 처리 방식]`
 - **무료체험(Free Trial)**: 첫 N일 0원 + 체험 종료 시 자동 정기결제 전환. 체험 기간 중 해지 시 결제 미발생
 - **환불 후처리**: 환불 발생 시 결제·환불 트랜잭션 기록 → **추천인 리워드는 지급 전(D+8 이내) 환불 시 배치 지급 대상에서 자동 제외**(첫 결제 기준 `PAYMENT_CANCEL` 검사). 지급 후 환수는 미구현 — 30일 클로백은 백로그로 인지
 

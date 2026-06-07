@@ -32,6 +32,16 @@
 - **RBAC 캐시 구현체 확정**: Redis 분산 캐시 (멀티 인스턴스 stale 문제 원천 차단)
 - `lian-resume-star.html` 작성 — 브라우저용 디자인 (Pretendard, 색상별 STAR, 키워드 칩, 면접 Q&A 테이블)
 
+### 2026-05-31 (오후) — 전문가 패널 기술 심화 재검토
+- **전문가 5인 병렬 재검토** (백엔드아키텍트 / AppSec / DB성능 / SRE / 클라우드아키텍트)
+  - 1차 리뷰는 글쓰기·구성 중심 → 이번엔 **기술 디테일·면접 내구성** 중심
+  - 종합: 🔴 Critical 10 / 🟡 Warning 14 / 🟢 Good 18
+- **산출물 3종 생성**:
+  - `expert-review-2026-05-31.md` — 종합 평가 + 액션아이템
+  - `tech-study-resources.md` — 기술별 학습자료(검증 URL, ⭐ 우선순위)
+  - `interview-questions-by-tech.md` — 기술별 심화 면접질문(기존 34개와 비중복, 🔥 11개)
+- **Critical 핵심**: ① 빈칸 수치 ② 외부노출방식 미확정/Collector구성 미기입 ③ 결제 멱등성(토스 Idempotency-Key + DuplicateKeyException skip) ④ N+1/인덱스 구체화 ⑤ SLO/SLI 부재 ⑥ 멀티인스턴스 배치(ShedLock)
+
 ### 2026-05-31 — STAR 4 격상 + GitHub repo 생성·push
 - **멤버십 자동결제 시스템 사실 추가** (사용자 확인)
   - PG: 토스페이먼츠
@@ -85,6 +95,15 @@
   - ※ 클로백 없음 = 버그 아니라 **D+8·무환수 현 스코프 결정**(30일 클로백은 다채널 백로그)
 - **면접 노트 신규 작성** → `STAR4-멤버십-추천인-면접노트.md` (외울 숫자·강점·약점·예상질문·정정사항)
 - STAR 4 Q&A 6건 정정/추가(.md/.html)
+
+### 2026-06-07 — 2차 전문가 심화 검토 + 본문 보강
+- **2차 전문가 패널 5인**(보안/백엔드/DB/SRE/클라우드) adversarial 재검증 — 1차 해소분 제외, **신규 약점 발굴 + 논리 일관성** 집중
+- **논리적 균열 5곳** 도출: ① "즉시 무효화 0초" ↔ 토큰캐시 10분 stale(자기모순) ② 결제 멱등성 O ↔ 환불 멱등성 X(비대칭) ③ "IDOR 방어" ↔ 수평 테넌트 IDOR 침묵(주장 vs 구현) ④ STAR1 분산 ↔ STAR2 모놀리식 관측(불일치) ⑤ 강점만 나열, 트레이드오프 침묵
+- **STAR 1 신규 Critical**: X-Gateway-Header 정적마커 우회(서명/mTLS 필요), 게이트웨이 SPOF + /rbac/permissions 동기의존, 목록 API 객체레벨 인가 N+1, fallback 토큰 재검증 명시 필요
+- **STAR 4**: 실코드 정밀화로 해소·정정 확인(멱등=조건부 UPDATE 선점, 0원 클램프, D+8 환불제외), 잔존 = 가짜 피추천인 Sybil·환불 자체 멱등성
+- **검토 산출물 3종 동기화**: `expert-review-2026-05-31.md`(2차 섹션), `interview-questions-by-tech.md`(신규 질문+정정), `tech-review.html`(2차 블록+STAR4 정정)
+- **본문 보강(`lian-resume-star.md`)**: 수평 테넌트 인가/게이트웨이 마커·SPOF/토큰캐시 무효화/환불 멱등성/STI 모델링/알림톡 Outbox/게이트웨이 trace·SLI 등 — **구현 불명 항목은 `[확인]` 마커**로 표기(코드 확인 후 확정). 공유용 `.html`엔 미확정 마커 미반영
+- ⏳ **본인 확인 필요(`[확인]`)**: 토큰캐시 역인덱스 무효화 / 수평 테넌트(brandId) 검증 위치 / 목록 권한 필터 방식 / fallback 토큰 재검증 / 게이트웨이 마커 서명 여부·trace 전파 / 환불 멱등 처리 / 3종 STI·1:1 Inquiry aggregate / 알림톡 Outbox 여부
 
 ---
 

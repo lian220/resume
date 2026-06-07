@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lian — 전문가 패널 기술 검토 대시보드</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<style>
+  :root {
+    --bg: #f8fafc; --card-bg: #ffffff; --text: #0f172a; --text-muted: #64748b; --text-soft: #94a3b8;
+    --border: #e2e8f0; --border-soft: #f1f5f9; --accent: #4f46e5;
+    --star1: #7c3aed; --star2: #0ea5e9; --star3: #10b981; --star4: #f59e0b;
+    --critical: #dc2626; --warning: #d97706; --good: #059669;
+    --chip-bg: #f1f5f9; --chip-text: #475569; --code-bg: #f8fafc; --hl-bg: #fef3c7;
+    --shadow-sm: 0 1px 2px rgba(15,23,42,.04), 0 1px 3px rgba(15,23,42,.06);
+    --shadow-md: 0 4px 12px rgba(15,23,42,.06), 0 2px 4px rgba(15,23,42,.04);
+    --shadow-lg: 0 20px 50px rgba(15,23,42,.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.7; -webkit-font-smoothing: antialiased; font-feature-settings: 'tnum';
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 48px 24px 120px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  header { text-align: center; margin-bottom: 32px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; }
+  header .subtitle { color: var(--text-muted); font-size: 15px; font-weight: 500; }
+  header .badges { display: flex; justify-content: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .badge { padding: 4px 12px; background: var(--chip-bg); color: var(--chip-text); border-radius: 999px; font-size: 12px; font-weight: 600; }
+
+  /* score cards */
+  .scoreboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
+  .score { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 20px; text-align: center; box-shadow: var(--shadow-sm); }
+  .score .num { font-size: 38px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+  .score .lbl { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-top: 8px; }
+  .score.crit .num { color: var(--critical); }
+  .score.warn .num { color: var(--warning); }
+  .score.good .num { color: var(--good); }
+  .verdict { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color:#fff; padding: 22px 28px; border-radius: 14px; margin-bottom: 36px; box-shadow: var(--shadow-md); font-size: 15px; }
+  .verdict strong { font-weight: 700; }
+
+  /* tabs */
+  .tabs { display: flex; gap: 6px; position: sticky; top: 0; background: var(--bg); padding: 14px 0; z-index: 10; border-bottom: 1px solid var(--border); margin-bottom: 28px; flex-wrap: wrap; }
+  .tab { padding: 9px 18px; border-radius: 999px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: #fff; color: var(--text-muted); transition: all .15s; }
+  .tab:hover { border-color: var(--accent); color: var(--accent); }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .panel { display: none; }
+  .panel.active { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px);} to { opacity:1; transform:none; } }
+
+  h2.section { font-size: 21px; font-weight: 800; letter-spacing: -0.02em; margin: 36px 0 16px; padding-bottom: 8px; border-bottom: 2px solid var(--border-soft); }
+  h2.section:first-child { margin-top: 0; }
+  h3.sub { font-size: 16px; font-weight: 700; margin: 24px 0 12px; color: var(--text); }
+
+  .grade-block { border-radius: 12px; padding: 4px 0; margin-bottom: 10px; }
+  .item { background: var(--card-bg); border: 1px solid var(--border); border-left-width: 4px; border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; box-shadow: var(--shadow-sm); }
+  .item.crit { border-left-color: var(--critical); }
+  .item.warn { border-left-color: var(--warning); }
+  .item.good { border-left-color: var(--good); }
+  .item .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; margin-right: 6px; vertical-align: middle; }
+  .tag.t-sec { background:#fee2e2; color:#b91c1c; }
+  .tag.t-be { background:#ede9fe; color:#6d28d9; }
+  .tag.t-db { background:#d1fae5; color:#047857; }
+  .tag.t-sre { background:#e0f2fe; color:#0369a1; }
+  .tag.t-cloud { background:#fef3c7; color:#b45309; }
+  .item strong { font-weight: 700; }
+  .item .num-badge { font-weight:800; margin-right:6px; }
+  .item.crit .num-badge { color: var(--critical); }
+
+  code { background: var(--code-bg); border: 1px solid var(--border-soft); border-radius: 5px; padding: 1px 6px; font-size: 13px; font-family: 'SFMono-Regular', Consolas, monospace; color: #be123c; }
+  .hl { background: var(--hl-bg); padding: 0 3px; border-radius: 3px; font-weight: 600; }
+
+  /* action list */
+  ol.actions { list-style: none; counter-reset: a; }
+  ol.actions li { counter-increment: a; position: relative; padding: 12px 16px 12px 52px; background:#fff; border:1px solid var(--border); border-radius:10px; margin-bottom:10px; box-shadow: var(--shadow-sm); }
+  ol.actions li::before { content: counter(a); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; background: var(--accent); color:#fff; border-radius: 999px; font-size: 13px; font-weight: 700; display:flex; align-items:center; justify-content:center; }
+
+  /* resources */
+  .res-group { margin-bottom: 26px; }
+  .res { background:#fff; border:1px solid var(--border); border-radius:10px; padding: 12px 16px; margin-bottom: 8px; box-shadow: var(--shadow-sm); }
+  .res .star { color: var(--star4); font-weight: 800; margin-right: 4px; }
+  .ytmark { margin-right: 4px; }
+  .res .desc { font-size: 13.5px; color: var(--text-muted); margin-top: 3px; }
+  .res .title { font-weight: 600; font-size: 14.5px; }
+
+  /* Q&A */
+  .qa { background:#fff; border:1px solid var(--border); border-radius:12px; margin-bottom:12px; box-shadow: var(--shadow-sm); overflow:hidden; }
+  .qa summary { padding: 14px 18px; cursor: pointer; font-weight: 600; font-size: 15px; list-style:none; display:flex; align-items:flex-start; gap:8px; }
+  .qa summary::-webkit-details-marker { display:none; }
+  .qa summary:hover { background: var(--border-soft); }
+  .qa[open] summary { border-bottom:1px solid var(--border-soft); }
+  .fire { color:#ef4444; }
+  .qa .body { padding: 14px 18px; font-size: 14px; }
+  .qa .why { color: var(--text-muted); margin-bottom: 8px; }
+  .qa .why b, .qa .key b { color: var(--text); }
+  .qa .key { background: var(--code-bg); border-left:3px solid var(--good); padding: 10px 14px; border-radius:6px; }
+  .domain-head { font-size: 18px; font-weight: 800; margin: 30px 0 14px; padding: 8px 14px; border-radius: 8px; color:#fff; }
+  .dh1 { background: var(--star1);} .dh2 { background: var(--star2);} .dh3 { background: var(--star3);} .dh4 { background: var(--star4);} .dh5 { background:#475569; }
+  .note { font-size: 13px; color: var(--text-soft); margin-top: 20px; padding: 14px 18px; background: var(--border-soft); border-radius: 10px; }
+  footer { text-align:center; margin-top: 60px; padding-top: 24px; border-top:1px solid var(--border); color: var(--text-soft); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>전문가 패널 기술 검토 대시보드</h1>
+    <div class="subtitle">Lian (임도영) 백엔드 시니어 이력서 — STAR 4개 심화 리뷰</div>
+    <div class="badges">
+      <span class="badge">2026-05-31</span>
+      <span class="badge">전문가 5인</span>
+      <span class="badge">백엔드 · 보안 · DB · SRE · 클라우드</span>
+    </div>
+  </header>
+
+  <div class="scoreboard">
+    <div class="score crit"><div class="num">9</div><div class="lbl">🔴 Critical <span style="color:var(--good);font-size:11px;">−1</span></div></div>
+    <div class="score warn"><div class="num">10</div><div class="lbl">🟡 Warning <span style="color:var(--good);font-size:11px;">−4</span></div></div>
+    <div class="score good"><div class="num">23</div><div class="lbl">🟢 Good <span style="color:var(--good);font-size:11px;">+5</span></div></div>
+  </div>
+  <p style="text-align:center;color:var(--text-soft);font-size:12px;margin:-4px 0 16px;">※ 위 집계는 1차(6/1) 기준. 2차(6/7) 심화 검토의 논리 균열·신규 Critical은 평가 탭 상단 참조.</p>
+  <div class="verdict" style="background:linear-gradient(135deg,#7c3aed 0%,#0ea5e9 100%);">
+    <strong>🔁 2026-06-07 2차 심화 검토 —</strong> STAR 1·4가 실코드로 정교해진 만큼 새 약점을 adversarial하게 재검증. 설계는 A급이나 <strong>"트레이드오프를 의식적으로 선택했다"는 서사 부재</strong>로 약점이 노출됨 → <strong>논리적 균열 5곳</strong>(아래 표). 신규 Critical은 게이트웨이 보안(정적 마커·SPOF)에 집중. STAR 4는 실코드 정밀화로 멱등성·어뷰징·정회원 전환율(30.2%) 해소·정정.
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="eval">📊 종합 평가</div>
+    <div class="tab" data-tab="study">📚 학습 자료</div>
+    <div class="tab" data-tab="interview">💬 면접 질문</div>
+  </div>
+
+  <!-- ===================== 평가 ===================== -->
+  <div class="panel active" id="eval">
+    <h2 class="section">🔁 2차 심화 검토 (2026-06-07) — 논리적 균열 5곳</h2>
+    <p style="color:var(--text-muted);font-size:14px;margin-bottom:14px;">설계는 A급이나, 이력서가 <strong>트레이드오프를 "의식적으로 선택했다"고 말하지 않아</strong> 약점이 노출됨. 각 1줄 보강으로 해결.</p>
+    <div class="item crit"><span class="num-badge">1</span><strong>자기모순</strong> · STAR1 "권한 변경 <strong>즉시 무효화(0초)</strong>" ↔ 토큰 RBAC 캐시 <strong>10분</strong>(SHA-256 키라 역추적 불가) → 무효화 API가 토큰 캐시까지 evict함을 명시 or "0초"를 role 캐시 한정으로 수정.</div>
+    <div class="item warn"><span class="num-badge">2</span><strong>비대칭</strong> · 결제 멱등성 O ↔ <strong>환불 멱등성</strong> 서술 0 → 토스 Idempotency-Key + 누적환불액 불변식 한 줄.</div>
+    <div class="item warn"><span class="num-badge">3</span><strong>주장 vs 구현</strong> · "IDOR 방어" ↔ 객체인가는 <strong>수직 상승만</strong>, 수평(다른 브랜드) IDOR 침묵 / 마스킹 "다층" ↔ 로그·예외·엑셀 누락 → 객체인가에 <strong>테넌트 스코프(brandId) 일치</strong> 명시.</div>
+    <div class="item warn"><span class="num-badge">4</span><strong>STAR 간 불일치</strong> · STAR1=분산(게이트웨이+6서비스) ↔ STAR2=<strong>모놀리식 관측 서사</strong> → STAR2에 게이트웨이/Redis SLI·traceparent 전파 추가.</div>
+    <div class="item warn"><span class="num-badge">5</span><strong>강점만 나열</strong> · 게이트웨이 SPOF·3중 인가 중복·N+1 비용에 "왜 감수했나" 0줄 / STAR3 양적 성과만 → 각 트레이드오프 1줄.</div>
+
+    <h3 class="sub" style="color:var(--critical)">🔴 STAR 1 — 신규 Critical (게이트웨이가 만든 새 공격면)</h3>
+    <div class="item crit"><span class="tag t-sec">SECURITY</span> <strong>X-Gateway-Header 정적 마커 = 인가 우회 단일 최대 약점</strong>. 유출/SSRF/내부자 시 헤더 위조로 다운스트림 직접 침투(Traefik·oauth2-proxy 동일 CVE 패턴) → <strong>서명 마커(HMAC/JWT, 수초 만료) or mTLS + 네트워크 격리</strong>로 한정 표기 필수.</div>
+    <div class="item crit"><span class="tag t-sec">SECURITY</span> <strong>fallback 필터가 우회 경로를 정상 처리할 위험</strong> → <code>RbacHeaderInjectingFilter</code>가 <strong>헤더 불신 + 토큰 자체 재검증</strong>임을 명시해야 무인증 우회 차단 성립.</div>
+    <div class="item crit"><span class="tag t-cloud">CLOUD</span> <strong>게이트웨이 = 새 SPOF + <code>/rbac/permissions</code> 동기 의존</strong> → 다중화·헬스체크·서킷브레이커(Resilience4j)·retry storm(backoff+jitter+coalescing) 답변 필요.</div>
+    <div class="item crit"><span class="tag t-db">DB</span> <strong>목록 API 객체레벨 인가 N+1</strong> → <code>permissionByRole</code>는 "유저→역할"을 못 흡수. 권한 조건 WHERE pushdown or 유저→역할 캐시.</div>
+    <h3 class="sub" style="color:var(--warning)">🟡 STAR 1 — 신규 Warning</h3>
+    <div class="item warn"><span class="tag t-sec">SECURITY</span> 수평 테넌트 IDOR(role_priority는 수직만) · 마스킹 누락경로(로그/예외/엑셀/중첩) · 토큰캐시 키 카디널리티 폭증(volatile-lru+네임스페이스) · cache stampede(permissionByRole 1분) · 와일드카드 이중구현(AntPathMatcher↔matchesPermission) · @Deprecated+fallback EOL 조건 없음.</div>
+    <h3 class="sub" style="color:var(--warning)">🟡 STAR 2 — 신규 (분산 시스템화 불일치)</h3>
+    <div class="item crit"><span class="tag t-sre">SRE</span> 게이트웨이 자체 SLI 부재(인가 P95 hit/miss 분리 + <code>/rbac/permissions</code> 가용성) · 분산 trace전파(traceparent가 게이트웨이 건너 전파되나, SCG reactor 비동기 context 누수).</div>
+    <div class="item warn"><span class="tag t-sre">SRE</span> Redis cross-STAR blast radius(권한캐시+JTI+결제멱등성 공유) SLI · 정성주장은 단일장애 Before/After 내러티브 + 제도화 artifact로 입증.</div>
+    <h3 class="sub" style="color:var(--warning)">🟡 STAR 3 — 여전히 얕음 (C+)</h3>
+    <div class="item crit"><span class="tag t-be">BACKEND</span> 3종 컨텐츠 STI 모델링 결정 0줄 → STI(폴리모픽 목록 지배+필드발산 작음, nullable 트레이드오프) 명시.</div>
+    <div class="item warn"><span class="tag t-be">BACKEND</span> 1:1 문의 thread = Inquiry(aggregate root) 1:N Reply 구조 · 알림톡 재시도 = Transactional Outbox인지 단순 retry인지 정확히(dual-write 노출 갈림).</div>
+    <h3 class="sub" style="color:var(--good)">✅ STAR 4 — 실코드 정밀화로 해소·정정 (cancun-api)</h3>
+    <div class="item good"><span class="tag t-db">DB</span><span class="tag t-sec">SECURITY</span> <strong>멱등성 정정</strong>: <s>(memberId, rewardDate) 유니크</s> → <strong>조건부 UPDATE(PENDING→GRANTED, row count 선점) + 같은 트랜잭션 발급</strong>(PK = membershipId,promotionId, 분산락 없이 정확히 1회). <strong>0원 클램프</strong>(1원 아님). D+8 이내 환불 = 지급 제외(<code>MIN(paidAt)</code>), 지급 후 클로백 미구현=백로그 인지.</div>
+    <div class="item good"><span class="tag t-sec">SECURITY</span> 어뷰징 방어: 자기추천 차단·999개월 쿨다운·사업자번호 키 NULL-safe·리워드 스냅샷·실패 격리(PENDING→FAILED+Slack+수동 멱등 재처리). <strong>정회원 전환율 30.2%</strong>(9,723→2,936) 확정.</div>
+    <div class="item warn"><span class="tag t-sec">SECURITY</span> ⚠️ 잔존(본인 인지✅): 가짜 피추천인 Sybil(다른 사업자번호 shell)+환불 타이밍 → fraud 휴리스틱+클로백 / 환불 API 자체 멱등성(이중 환불) 별도 보강 권장.</div>
+
+    <h2 class="section">🔴 1차 Critical — 즉시 조치 (제출 전 필수)</h2>
+
+    <h3 class="sub">인증·인가 (STAR 1) <span style="font-size:13px;color:var(--good);font-weight:700;">— 실제 코드 반영으로 대부분 해소 ✅</span></h3>
+    <div class="item good"><span class="num-badge" style="color:var(--good)">✅</span><span class="tag t-sec">SECURITY</span> <strong>[해소] "서버 이중 검증 위치 모호"</strong> → 실제 코드로 명확: <strong>게이트웨이 ENDPOINT 인가(<code>AntPathMatcher</code>) + <code>@PreAuthorize hasPermission</code> 함수레벨 + <code>DomainPermissionEvaluator</code> 객체레벨</strong> 3중 집행.</div>
+    <div class="item warn"><span class="num-badge">2</span><span class="tag t-be">BACKEND</span> <strong>[Critical→Warning 강등] 앱측 자체 JWT 발급 컴포넌트명</strong>만 잔존. BO측은 <code>oauth2_authorization</code> 테이블 사용 확인됨. 앱측 <code>OAuth2TokenCustomizer</code> 등은 한 줄 특정 권장.</div>
+
+    <h3 class="sub">결제·빌링 (STAR 4)</h3>
+    <div class="item crit"><span class="num-badge">3</span><span class="tag t-sec">SECURITY</span> 결제 일배치 <strong>partial failure 방어 누락</strong>. PG 성공 후 DB 저장 실패 시 재시도하면 이중 청구 가능 → 토스 <code>Idempotency-Key</code> 헤더 전달 필요.</div>
+    <div class="item crit"><span class="num-badge">4</span><span class="tag t-db">DB</span> 유니크 제약 <strong>race condition 예외 처리 미서술</strong>. <code>DuplicateKeyException</code> catch → skip 처리가 있어야 멱등성 완성.</div>
+
+    <h3 class="sub">소통관리 / DB (STAR 3)</h3>
+    <div class="item crit"><span class="num-badge">5</span><span class="tag t-db">DB</span> N+1 제거에 <strong>수치·실행계획·전략 전무</strong>. Fetch Join인지 <code>@BatchSize</code>인지 + <span class="hl">Fetch Join + Pageable = HHH90003004</span>(전체 메모리 로딩) 함정 인지 보여줄 것.</div>
+    <div class="item crit"><span class="num-badge">6</span><span class="tag t-db">DB</span> <strong>복합 인덱스 대상 컬럼 미기재</strong>. 컬럼 순서가 곧 설계 근거 → 실제 컬럼 조합 + 순서 이유(쿼리 패턴).</div>
+
+    <h3 class="sub">관측성 (STAR 2)</h3>
+    <div class="item crit"><span class="num-badge">7</span><span class="tag t-sre">SRE</span> <strong>SLO/SLI 정의 전무</strong>. "P95 알람"만 있고 임계값 근거 없음 → 가용성·레이턴시 SLI 선정 + 목표치 한 문장.</div>
+    <div class="item crit"><span class="num-badge">8</span><span class="tag t-sre">SRE</span> <strong>에러 버짓(error budget) 개념 부재</strong>. 없으면 "알람 Slack 통보" 수준에 머묾.</div>
+    <div class="item crit"><span class="num-badge">9</span><span class="tag t-sre">SRE</span> <strong>Collector SPOF 영향 경계 미설계</strong>. "관측성 다운 ≠ 서비스 다운"을 OTLP exporter timeout/queue 설정으로 어떻게 구현했는지.</div>
+
+    <h3 class="sub">인프라 (STAR 2)</h3>
+    <div class="item crit"><span class="num-badge">10</span><span class="tag t-cloud">CLOUD</span> 외부 노출 차단 방식이 <code>SG / VPN / 프록시</code> <strong>3개 OR 병기 = 미확정 메모 상태</strong>. 실제 적용 1개만 남길 것. (+ Collector 샘플링 "[실제 구성]" 미완성 답변도 채울 것)</div>
+
+    <h2 class="section">🟡 Warning — 개선 권장</h2>
+    <div class="item good"><strong>✅ 2026-06-01 해소 (STAR 1 코드 반영)</strong> · Redis TTL(permissionByRole 1분 / 토큰 RBAC 10분 SHA-256) · 권한 변경 후 BO 반영 즉시(0초) · QA 안정화 18건(17 배포완료) · 서버 권한검증 위치 3중 집행으로 특정.</div>
+    <div class="item warn"><strong>수치 빈칸 (가장 시급) — STAR 2·3·4만 잔존</strong> · SigNoz 비용 절감액, EC2 사양, ClickHouse 보존일수 / 디버깅 시간 단축, 확산 증거, 알람 임계값 / STAR 3 P95 before-after / 정회원 전환율(쿼리 준비됨, 수치만 실행). <span class="hl">작은 실수치라도 빈칸보다 낫다.</span></div>
+    <div class="item warn"><span class="tag t-sec">SECURITY</span> JTI 블랙리스트 TTL을 AT 만료시각과 동기화(+clock skew) · Apple <code>.p8</code> 저장 위치 본문 명시 · 빌링키 DB 컬럼 암호화 · 토스 Webhook 서명 검증(HMAC) · Rate Limiting 전략(키 단위·분산 카운터).</div>
+    <div class="item warn"><span class="tag t-be">BACKEND</span> "비동기 재시도 큐"(알림톡/ERP/Deauth) 실체 → <span class="hl">Transactional Outbox</span>로 명명 · 상태머신 guard 위치(서비스 if=빈혈모델 vs enum 내부).</div>
+    <div class="item warn"><span class="tag t-cloud">CLOUD</span> EBS 스냅샷 RPO(24h)/RTO 수치, DLM 자동화 여부 · <span class="tag t-db">DB</span> 결제 배치 조회 <code>(billing_date, status)</code> 인덱스 / 대량 처리 청크·커서.</div>
+
+    <h2 class="section">🟢 Good — 잘 된 점 (유지)</h2>
+    <h3 class="sub" style="color:var(--good)">🆕 STAR 1 실제 코드로 입증된 강점 (2026-06-01)</h3>
+    <div class="item good"><span class="tag t-sec">SECURITY</span> <strong>함수레벨+객체레벨 이중 인가로 IDOR/수직권한상승 차단</strong> → <code>@PreAuthorize hasPermission(#rosUserId,...)</code>로 호출자 기능권한 + <strong>대상 객체 역할까지 재검증</strong>. SUPERVISOR가 SUPER_ADMIN 계정 못 건드림. OWASP API1 정공법.</div>
+    <div class="item good"><span class="tag t-sec">SECURITY</span><span class="tag t-be">BACKEND</span> <strong>API 게이트웨이 중앙 RBAC 집행 + 헤더 위조 차단</strong> → Spring Cloud Gateway 단일 관문, 클라 권한 헤더를 권위 값으로 덮어쓰고 <code>X-Gateway-Header</code> 신뢰 마커로 우회 차단. 다운스트림 JWT 재파싱 불필요.</div>
+    <div class="item good"><span class="tag t-sec">SECURITY</span> <strong>응답 PII 마스킹 AOP</strong> → <code>@MaskIfNoPermission</code>+<code>DtoMaskingAspect</code>로 응답 직렬화 시점까지 다층 인가(<code>010-****-5678</code>).</div>
+    <div class="item good"><span class="tag t-be">BACKEND</span> <strong>3단 권한 모델(ROOT/FUNCTION/ENDPOINT) + 와일드카드 계층 매칭</strong> + 감사 추적(<code>ros_permission_deleted</code> JSONB 스냅샷).</div>
+    <h3 class="sub">기존 강점</h3>
+    <div class="item good"><span class="tag t-sec">SECURITY</span> OAuth 2.0+PKCE(S256)+Implicit 배제 → RFC 9700 / OAuth 2.1 권고와 정확히 일치.</div>
+    <div class="item good"><span class="tag t-sec">SECURITY</span> RTR + Refresh Token Family 무효화 → RFC 9700 reuse detection 직접 구현.</div>
+    <div class="item good"><span class="tag t-sec">SECURITY</span> JWT 권한 = FE 분기 전용 + 서버 검증 trade-off 인식 → OWASP API3 대응. 많은 후보가 생략하는 구분.</div>
+    <div class="item good"><span class="tag t-sec">SECURITY</span> 카드정보 BE 미저장 + 빌링키만(vault 위임) → PCI DSS v4.0 PAN 비저장 원칙.</div>
+    <div class="item good"><span class="tag t-be">BACKEND</span> Calculator Strategy 패턴 의식적 회피 + 근거 명시 → 시니어 판단력 신호.</div>
+    <div class="item good"><span class="tag t-db">DB</span> 외부 호출 ↔ DB 트랜잭션 경계 분리 → 커넥션 풀 hold time 인식. DB 운영 경험자만 아는 포인트.</div>
+    <div class="item good"><span class="tag t-sre">SRE</span> OTel Agent(자동)+SDK span(선별) 분리 + span 폭증 방지 → 2026 모범 사례 일치.</div>
+    <div class="item good"><span class="tag t-sre">SRE</span> traceId MDC 로그 연관 → trace-log correlation 올바른 구현.</div>
+    <div class="item good"><span class="tag t-cloud">CLOUD</span> SaaS vs OSS 이중 근거(비용+데이터 주권) + Redis 단일 진실 원천 선택 근거.</div>
+
+    <h2 class="section">✅ 액션 아이템 (우선순위순)</h2>
+    <ol class="actions">
+      <li><strong>빈칸 수치 전부 채우기</strong> — 사내 Grafana/CloudWatch/Slack 이력 확인. (작은 실수치 &gt; 빈칸) <span class="hl">단일 최우선</span></li>
+      <li><strong>외부 노출 차단 방식 1개로 확정</strong> + Collector 구성/샘플링 실제값 기재</li>
+      <li><strong>결제 멱등성 보강</strong>: 토스 <code>Idempotency-Key</code> + <code>DuplicateKeyException</code> skip</li>
+      <li><strong>N+1/인덱스 구체화</strong>: Fetch Join vs @BatchSize 전략 + 실제 인덱스 컬럼·순서</li>
+      <li><strong>SLO/SLI 한 문장</strong> + 알람 임계값 = SLO 역산 서술</li>
+      <li><strong>Spring Auth Server 컴포넌트명 / 서버 권한검증 위치 특정</strong></li>
+      <li>"비동기 재시도 큐" → Transactional Outbox 명명 / 상태머신 guard 위치 명확화</li>
+    </ol>
+    <div class="note">📌 면접 직전이면 1·3·4·5만 메워도 방어력이 확 오른다. <strong>1번(수치)이 단일 최우선.</strong></div>
+  </div>
+
+  <!-- ===================== 학습 자료 (한글 위주) ===================== -->
+  <div class="panel" id="study">
+    <div class="note" style="margin-top:0;margin-bottom:20px;"><span class="ytmark">▶️</span> = 영상/유튜브 · <span class="star">⭐</span> = 우선 정독 · 📄 = 공식문서. <strong>국내 컨퍼런스(토스 SLASH·우아콘)·유튜브·한글 블로그 위주</strong>로 모았습니다. 맨 아래에 영문 원문(심화)을 접어 두었습니다.</div>
+
+    <div class="domain-head dh1">STAR 1 — 인증·인가 (OAuth / JWT / RBAC)</div>
+    <div class="res-group">
+      <div class="res"><span class="ytmark">▶️</span><span class="star">⭐</span><span class="title"><a href="https://www.youtube.com/playlist?list=PL1DJtS1Hv1PiGXmgruP1_gM2TSvQiOsFL" target="_blank">토스 SLASH 개발자 컨퍼런스 (전체 플레이리스트)</a></span><div class="desc">토스의 인증·결제·서버 설계 발표 모음. "토큰", "인증", "결제" 키워드로 골라 볼 것. 국내 최고 수준 실전 사례.</div></div>
+      <div class="res"><span class="star">⭐</span><span class="title"><a href="https://www.igloo.co.kr/security-information/spring-security-part2-oauth-2-0-%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98-%EC%9D%B4%ED%95%B4%EC%99%80-%EB%B3%B4%EC%95%88-%EC%B7%A8%EC%95%BD%EC%A0%90-%EC%82%AC%EB%A1%80/" target="_blank">Spring Security: OAuth 2.0 아키텍처 이해와 보안 취약점 사례 (이글루)</a></span><div class="desc">OAuth 2.0 흐름 + PKCE가 막는 공격(인가코드 가로채기)을 한글로 정리. 면접 "PKCE 왜 썼나" 답변 근거.</div></div>
+      <div class="res"><span class="title"><a href="https://godekdls.github.io/Spring%20Security/oauth2/" target="_blank">Spring Security 공식 문서 한글 번역 — OAuth2 (토리맘의 한글라이즈)</a></span><div class="desc">Spring Security OAuth2 공식 레퍼런스 한글판. <code>oauth2Login()</code>·토큰 커스터마이징 진입점 이해.</div></div>
+      <div class="res"><span class="title"><a href="https://engineering-skcc.github.io/security/jwt-token/" target="_blank">서버 기반 인증 vs 토큰 기반 인증 (SK C&amp;C 기술블로그)</a></span><div class="desc">세션 vs JWT 트레이드오프, 토큰 저장 위치 논의. "왜 자체 JWT인가" 기본 정리.</div></div>
+      <div class="res"><span class="title"><a href="https://jaeyeong951.medium.com/caching-with-redis-888071bc1f15" target="_blank">Caching With Redis — 캐시 전략 (jaeyeong951)</a></span><div class="desc">Cache-aside, 무효화 전략. RBAC 권한 캐시 + invalidation 설계 배경.</div></div>
+      <div class="res"><span class="title"><a href="https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/" target="_blank">OWASP API1:2023 — Broken Object Level Authorization (IDOR)</a></span><div class="desc">STAR 1의 함수/객체 이중 인가가 막는 바로 그 취약점. "수직 권한 상승 어떻게 막았나" 답변의 이론 근거.</div></div>
+    </div>
+
+    <div class="domain-head dh2">STAR 2 — 관측성 (OpenTelemetry / 분산추적)</div>
+    <div class="res-group">
+      <div class="res"><span class="ytmark">▶️</span><span class="star">⭐</span><span class="title"><a href="https://www.youtube.com/@woowatech" target="_blank">우아한테크 유튜브 채널 (우아콘·우아한테크세미나)</a></span><div class="desc">관측성·모니터링·분산추적 세션 다수. "OpenTelemetry", "모니터링", "트레이싱" 검색해서 시청.</div></div>
+      <div class="res"><span class="star">⭐</span><span class="title"><a href="https://saramin.github.io/2026-03-20-opentelemetry-in-action/" target="_blank">OpenTelemetry 도입기 (사람인 기술블로그, 2026)</a></span><div class="desc">실제 회사가 OTel 도입한 과정·시행착오. 이력서 STAR 2와 가장 유사한 한글 실전 사례.</div></div>
+      <div class="res"><span class="title"><a href="https://www.youngju.dev/blog/observability/2026-03-03-opentelemetry-distributed-tracing" target="_blank">OpenTelemetry 분산 트레이싱 실전 가이드 — 계측부터 시각화까지</a></span><div class="desc">Java 계측, context propagation, span 구성을 단계별로. <code>@WithSpan</code> 동작 이해.</div></div>
+      <div class="res"><span class="title"><a href="https://medium.com/@dudwls96/opentelemetry-%EB%9E%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80-18b6e4fe6e36" target="_blank">OpenTelemetry 란 무엇인가? (Paul, Medium)</a></span><div class="desc">Trace/Metric/Log 3축, 벤더 중립 개념 한글 입문. "왜 OTel(벤더락인 회피)인가" 답변용.</div></div>
+      <div class="res"><span class="title"><a href="https://www.openmaru.io/otel/" target="_blank">오픈텔레메트리는 무엇인가요? (OPENMARU APM)</a></span><div class="desc">APM 관점에서 OTel 구조·Collector 설명. SLO/샘플링 개념 보강.</div></div>
+    </div>
+
+    <div class="domain-head dh3">STAR 3 — JPA N+1 / DB 성능·인덱스</div>
+    <div class="res-group">
+      <div class="res"><span class="ytmark">▶️</span><span class="star">⭐</span><span class="title"><a href="https://www.youtube.com/playlist?list=PLtUgHNmvcs6rJBDOBnkDlmMFkLf-4XVl3" target="_blank">비전공자도 이해할 수 있는 MySQL 성능 최적화 (SQL 튜닝편) — 유튜브 풀강의</a></span><div class="desc">인덱스·실행계획·복합 인덱스 컬럼 순서를 그림으로. <span class="hl">복합 인덱스/EXPLAIN 면접 대비 1순위.</span></div></div>
+      <div class="res"><span class="ytmark">▶️</span><span class="star">⭐</span><span class="title"><a href="https://www.youtube.com/watch?v=usEsrsaSSuU" target="_blank">[10분 테코톡] 모디의 MySQL 실행 계획 (우아한테크코스)</a></span><div class="desc">EXPLAIN 핵심을 10분에. <code>type</code>, <code>key</code>, <code>Extra(Using filesort)</code> 빠르게 잡기.</div></div>
+      <div class="res"><span class="star">⭐</span><span class="title"><a href="https://www.inflearn.com/course/ORM-JPA-Basic" target="_blank">김영한 — 자바 ORM 표준 JPA 프로그래밍 (인프런)</a></span><div class="desc">N+1·Fetch Join·@BatchSize의 정석. 활용2(성능 최적화)편이 면접 단골 그대로. <strong>국내 백엔드 JPA 표준 교재.</strong></div></div>
+      <div class="res"><span class="title"><a href="https://tech.trenbe.com/2022/02/23/%EC%95%BC!-%EB%84%88%EB%8F%84-%ED%95%A0-%EC%88%98-%EC%9E%88%EC%96%B4,-N+1%ED%95%B4%EA%B2%B0.html" target="_blank">야! 너도 할 수 있어, N+1 해결 (트렌비 기술블로그)</a></span><div class="desc">Fetch Join vs @BatchSize vs EntityGraph 실무 비교 + <span class="hl">Fetch Join+페이징 함정</span>까지 한글로.</div></div>
+      <div class="res"><span class="title"><a href="https://engineering.linecorp.com/ko/blog/mysql-workbench-visual-explain-index" target="_blank">MySQL Workbench VISUAL EXPLAIN으로 인덱스 동작 확인 (LINE)</a></span><div class="desc">인덱스가 실제로 타는지 시각적으로 확인하는 법. "어떻게 진단했나" 답변 근거.</div></div>
+      <div class="res"><span class="title"><a href="https://medium.com/zigbang/mysql-%EC%9D%B8%EB%8D%B1%EC%8A%A4-%ED%8A%9C%EB%8B%9D-18e183e9246d" target="_blank">MySQL 인덱스 튜닝 (직방 기술블로그)</a></span><div class="desc">실제 서비스 인덱스 튜닝 사례. 복합 인덱스 선행 컬럼 원칙 실전.</div></div>
+      <div class="res"><span class="title"><a href="https://jonghoonpark.com/2024/11/03/mysql-full-scan-query-pattern" target="_blank">MySQL 풀 스캔 패턴 및 튜닝 — Real MySQL 스터디 (박종훈)</a></span><div class="desc">복합 인덱스 선행 컬럼 빠지면 인덱스 못 타는 케이스. 면접 단골 함정.</div></div>
+    </div>
+
+    <div class="domain-head dh4">STAR 4 — 결제·빌링 (토스페이먼츠 / 멱등성)</div>
+    <div class="res-group">
+      <div class="res"><span class="star">⭐</span><span class="title"><a href="https://docs.tosspayments.com/blog/what-is-idempotency" target="_blank">멱등성이 뭔가요? (토스페이먼츠 개발자센터)</a></span><div class="desc">Idempotency-Key 개념을 토스 공식이 한글로 쉽게. <span class="hl">결제 멱등성 면접 답변의 표준.</span> (Critical 3·4 직결)</div></div>
+      <div class="res"><span class="star">⭐</span><span class="title"><a href="https://docs.tosspayments.com/guides/billing/overview" target="_blank">자동결제(빌링) 이해하기 (토스페이먼츠 공식)</a></span><div class="desc">빌링키 발급 플로우 한글 공식. "카드정보 미저장, 빌링키만" 서술의 근거.</div></div>
+      <div class="res"><span class="title"><a href="https://www.tosspayments.com/blog/articles/dev-subscription-2" target="_blank">구독 결제 서비스 구현 (2) 스케줄링 설정하기 (토스페이먼츠)</a></span><div class="desc">정기결제 일배치 스케줄링 실전. STAR 4 결제 배치 설계와 직접 대응.</div></div>
+      <div class="res"><span class="title"><a href="https://velog.io/@yoonvelog/%EC%A0%95%EA%B8%B0%EA%B2%B0%EC%A0%9C-feat.-%ED%86%A0%EC%8A%A4%ED%8E%98%EC%9D%B4%EB%A8%BC%EC%B8%A0" target="_blank">정기결제 (feat. 토스페이먼츠) — 개발자 구현 후기</a></span><div class="desc">빌링키 정기결제를 직접 구현한 개인 개발 후기. 실수·고민 지점 참고.</div></div>
+      <div class="res"><span class="title"><a href="https://docs.tosspayments.com/reference/using-api/authorization" target="_blank">인증 및 기타 헤더 설정 (토스페이먼츠 — Idempotency-Key)</a></span><div class="desc">POST API에 Idempotency-Key 헤더 거는 실제 방법. PG 레벨 중복 차단 코드 근거.</div></div>
+    </div>
+
+    <div class="domain-head dh5">공통 — 트랜잭션 아웃박스 / 분산락 / 멀티인스턴스</div>
+    <div class="res-group">
+      <div class="res"><span class="star">⭐</span><span class="title"><a href="https://medium.com/@greg.shiny82/%ED%8A%B8%EB%9E%9C%EC%9E%AD%EC%85%94%EB%84%90-%EC%95%84%EC%9B%83%EB%B0%95%EC%8A%A4-%ED%8C%A8%ED%84%B4%EC%9D%98-%EC%8B%A4%EC%A0%9C-%EA%B5%AC%ED%98%84-%EC%82%AC%EB%A1%80-29cm-0f822fc23edb" target="_blank">트랜잭셔널 아웃박스 패턴의 실제 구현 사례 (29CM)</a></span><div class="desc">"DB 트랜잭션과 외부 호출 분리"를 실제 서비스가 어떻게 구현했나. <span class="hl">알림톡·ERP 재시도 = Outbox</span> 명명 근거.</div></div>
+      <div class="res"><span class="title"><a href="https://techblog.woowahan.com/15488/" target="_blank">WOOWACON 2023 리캡 (우아한형제들 기술블로그)</a></span><div class="desc">우아콘 결제·이벤트·아웃박스(Debezium) 세션 요약. 대규모 결제 도메인 설계 시야.</div></div>
+      <div class="res"><span class="star">⭐</span><span class="title"><a href="https://velog.io/@recordsbeat/%EB%A9%80%ED%8B%B0-%EC%84%9C%EB%B2%84%EC%97%90%EC%84%9C-%EC%8A%A4%EC%BC%80%EC%A4%84-%EC%B2%98%EB%A6%AC%ED%95%98%EA%B8%B0-ShedLock" target="_blank">멀티 서버에서 스케줄 처리하기 — ShedLock</a></span><div class="desc"><code>lockAtMostFor</code>/<code>lockAtLeastFor</code> 한글 설명. <span class="hl">결제 일배치 멀티인스턴스 중복 방지</span> (Critical 직결).</div></div>
+      <div class="res"><span class="title"><a href="https://json-object.github.io/Implementing-Distributed-Schedule-Lock-using-ShedLock-in-Spring-Boot.html" target="_blank">ShedLock으로 멀티 노드 스케줄 중복 실행 방지 (JSON-OBJECT)</a></span><div class="desc">DB 유니크 제약이 못 막는 "동시 실행"을 분산락으로 막는 코드 예제.</div></div>
+      <div class="res"><span class="title"><a href="https://techblog.woowahan.com/22151/" target="_blank">전체 서비스를 관통하는 도메인 모듈을 안전하게 분리하기 (우아한형제들)</a></span><div class="desc">DDD 도메인 분리·헥사고날 적용 실전. 상태머신 guard 위치·도메인 경계 답변 근거.</div></div>
+    </div>
+    <div class="note">📌 <strong>한글 공부 순서</strong>: ① 토스 SLASH + 우아한테크 유튜브로 큰 그림 → ② MySQL 튜닝 유튜브 + 김영한 JPA로 N+1/인덱스 → ③ 토스 멱등성 문서로 결제 → ④ ShedLock + 29CM 아웃박스로 멀티인스턴스/재시도. <strong>영상부터 보고 블로그로 깊이 더하는 흐름 추천.</strong></div>
+
+    <details class="qa" style="margin-top:24px;"><summary>📄 영문 원문 레퍼런스 (정확한 스펙이 필요할 때만)</summary><div class="body">
+      <div class="res" style="box-shadow:none;border:none;padding:6px 0;"><a href="https://datatracker.ietf.org/doc/rfc9700/" target="_blank">RFC 9700 — OAuth 2.0 Security BCP</a> · <a href="https://datatracker.ietf.org/doc/html/rfc8725" target="_blank">RFC 8725 — JWT BCP</a> · <a href="https://owasp.org/API-Security/" target="_blank">OWASP API Security Top 10</a> — 인증/JWT 보안 스펙 원문</div>
+      <div class="res" style="box-shadow:none;border:none;padding:6px 0;"><a href="https://opentelemetry.io/docs/zero-code/java/agent/" target="_blank">OTel Java Agent 공식</a> · <a href="https://signoz.io/docs/instrumentation/overview/" target="_blank">SigNoz 공식 Docs</a> · <a href="https://www.nobl9.com/resources/a-complete-guide-to-error-budgets-setting-up-slos-slis-and-slas-to-maintain-reliability" target="_blank">SLO/Error Budget (Nobl9)</a> — 관측성 스펙</div>
+      <div class="res" style="box-shadow:none;border:none;padding:6px 0;"><a href="https://docs.spring.io/spring-authorization-server/reference/guides/how-to-social-login.html" target="_blank">Spring Authorization Server 공식</a> · <a href="https://spring.io/blog/2023/10/24/a-use-case-for-transactions-adapting-to-transactional-outbox-pattern/" target="_blank">Transactional Outbox (Spring 공식)</a> · <a href="https://www.baeldung.com/shedlock-spring" target="_blank">ShedLock (Baeldung)</a> — 구현 레퍼런스</div>
+    </div></details>
+  </div>
+
+  <!-- ===================== 면접 질문 ===================== -->
+  <div class="panel" id="interview">
+    <div class="note" style="margin-top:0;margin-bottom:20px;">⚠️ 이력서 하단 기존 Q&amp;A(34개)와 <strong>중복되지 않는 더 깊은 질문</strong>. <span class="fire">🔥</span> = 빈칸·허점 직결돼 거의 확실히 나올 질문. 질문을 클릭하면 답변 포인트가 펼쳐집니다.</div>
+
+    <div class="domain-head dh1">1. 인증·인가</div>
+    <details class="qa"><summary><span class="fire">🔥</span> Q1-1. Spring Auth Server에서 카카오 로그인 후 자체 JWT 발급까지 어떤 컴포넌트를 커스터마이징했나?</summary><div class="body"><div class="why"><b>왜:</b> 키워드만 쓴 사람 vs 실제로 다룬 사람 구분.</div><div class="key"><b>핵심:</b> <code>AuthenticationSuccessHandler</code>에서 OAuth2User→내부 User 매핑(JIT) → <code>OAuth2TokenCustomizer&lt;JwtEncodingContext&gt;</code>로 role·권한 커스텀 클레임 주입. Authorization Server(토큰 발급)와 <code>oauth2Login()</code>(Resource Owner 인증) 역할 분리 설명하면 가점.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q1-2. 운영자 권한 검증은 정확히 어느 레이어에서? <span style="color:var(--good);font-size:12px;">(실제 코드)</span></summary><div class="body"><div class="why"><b>왜:</b> "DB/캐시 확인한다"만으론 부족. OWASP API1/API3 방어 증명.</div><div class="key"><b>핵심(3중 집행):</b> ① <strong>게이트웨이</strong> <code>RbacAuthorizationFilter</code>가 <code>ENDPOINT_{METHOD}:{PATH}</code> 권한을 <code>AntPathMatcher</code>로 중앙 인가 → ② <strong>함수레벨</strong> <code>@PreAuthorize hasPermission(...)</code> <code>CustomPermissionEvaluator</code> → ③ <strong>객체레벨</strong> <code>DomainPermissionEvaluator</code> 대상 객체 역할 재검증. 코드 경로로 답 가능 = 강점.</div></div></details>
+    <details class="qa"><summary>Q1-3. JWT Access Token을 클라이언트 어디에 저장하나? (localStorage vs httpOnly cookie)</summary><div class="body"><div class="why"><b>왜:</b> XSS vs CSRF 트레이드오프 = JWT 보안의 절반.</div><div class="key"><b>핵심:</b> httpOnly+Secure+SameSite=Lax 쿠키 → XSS 탈취 불가(CSRF는 SameSite로 차단). localStorage → XSS 즉시 탈취. 모바일은 Keychain/Keystore. "우리는 [선택]+[위협모델 근거]".</div></div></details>
+    <details class="qa"><summary>Q1-4. 강제 무효화(계정 정지)는 어떻게? — 앱측 JTI vs BO측 경로 <span style="color:var(--good);font-size:12px;">(실제 코드)</span></summary><div class="body"><div class="why"><b>왜:</b> stateless JWT 강제 무효화 한계. ※ 정직성: caribbean-api(BO)엔 JTI 블랙리스트 테이블 <b>없음</b> — 경로가 다름.</div><div class="key"><b>핵심(경로 분리):</b> <strong>BO측</strong>은 계정 정지·권한 박탈 시 <code>oauth2_authorization</code> 폐기 + Redis 권한캐시 무효화로 즉시 차단. <strong>앱측</strong>은 JTI 블랙리스트(Redis TTL, 별도 레포). JTI TTL = AT exp + skew 마진으로 역산. "두 서비스가 무효화 책임을 각자 맞는 방식으로"가 정답.</div></div></details>
+    <details class="qa"><summary>Q1-5. RTR에서 동시 Refresh 요청(race condition)이 들어오면?</summary><div class="body"><div class="why"><b>왜:</b> RTR 이론적 약점. 동시 요청이 reuse로 오인돼 세션 전체 무효화.</div><div class="key"><b>핵심:</b> Redis <code>SET NX</code>/분산 락 또는 DB <code>SELECT FOR UPDATE</code>로 직렬화. 규모 작으면 "발생 빈도 낮고 재로그인으로 복구 가능한 수용된 위험" 정직하게.</div></div></details>
+    <details class="qa"><summary>Q1-6. Apple .p8 개인키는 어디에 저장하고 유출되면?</summary><div class="body"><div class="why"><b>왜:</b> 비대칭키 관리 = PKI 핵심. 유출 시 임의 client_secret 생성으로 우회.</div><div class="key"><b>핵심:</b> Parameter Store(SecureString)/Secrets Manager + IAM Role. 유출 시 Apple 포털 즉시 폐기+새 키+배포. 기존 "N일 전 자동 재생성"으로 긴급 교체 동일 파이프라인.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q1-8. SUPERVISOR가 SUPER_ADMIN 계정을 수정·삭제하는 수직 권한 상승은 어떻게 막나? <span style="color:var(--good);font-size:12px;">(IDOR, 실제 코드)</span></summary><div class="body"><div class="why"><b>왜:</b> OWASP API1(BOLA/IDOR). 함수 권한만 보면 "누구의 계정인지"는 놓치는 흔한 구멍.</div><div class="key"><b>핵심:</b> <code>@PreAuthorize hasPermission(#rosUserId, 'TYPE_ROS_USER', 'UPDATE_ACCOUNT')</code>가 ① 호출자 기능권한 + ② <strong>대상 유저 역할을 조회해 <code>HQ.{대상역할}.UPDATE_ACCOUNT</code> 보유 여부</strong>까지 객체 단위 재검증. <code>role_priority</code> 계층으로 하위가 상위 객체를 못 건드림. <strong>실제 구현이라 자신 있게.</strong> <span style="color:var(--warning)">⚠️ 2차: role_priority는 <strong>수직만</strong> — 다른 브랜드 침범(수평 IDOR)은 <strong>테넌트 스코프(brandId) 일치</strong>도 검증해야. B2B는 수평이 더 흔함.</span></div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q1-9. API 게이트웨이를 단일 RBAC 관문으로 둔 이유와 우회/SPOF 리스크는? <span style="color:var(--good);font-size:12px;">(실제 코드)</span></summary><div class="body"><div class="why"><b>왜:</b> 중앙 집행은 깔끔하나 SPOF·우회가 단골 반론.</div><div class="key"><b>핵심:</b> 권한 해석을 게이트웨이로 단일화(다운스트림 JWT 재파싱 제거). 우회 방어 = <code>X-Gateway-Header</code> 신뢰 마커로 경유 여부 판별, <strong>미경유 시 <code>RbacHeaderInjectingFilter</code> fallback</strong> 인가. SPOF는 게이트웨이 다중화로 대응.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q1-10. 클라이언트가 <code>X-Function-Permissions</code> 권한 헤더를 위조해서 보내면? <span style="color:var(--good);font-size:12px;">(실제 코드)</span></summary><div class="body"><div class="why"><b>왜:</b> 헤더 기반 권한 전파의 핵심 공격 벡터. 못 막으면 RBAC 전체 무력화.</div><div class="key"><b>핵심:</b> <strong>게이트웨이가 클라 권한 헤더를 권위 값으로 덮어쓴다</strong> — 외부 주입 <code>X-*-Permissions</code>는 진입 시 폐기되고 토큰 해석 결과로 재설정. 다운스트림은 <code>X-Gateway-Header</code> 마커 있는 요청만 신뢰.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q1-11. 객체레벨 인가가 <strong>목록 API(유저 100건)</strong>에서 N+1 인가 쿼리 유발 안 하나? <span style="color:var(--warning);font-size:12px;">(2차 심화)</span></summary><div class="body"><div class="why"><b>왜:</b> 단건은 OK지만 목록은 행 단위로 "대상 역할 조회" N번. <code>permissionByRole</code>는 역할→권한만 캐시, 유저→역할은 못 흡수.</div><div class="key"><b>핵심:</b> 단건(상세·수정)은 1건이라 문제없음. <strong>목록은 권한 조건을 WHERE로 pushdown</strong>(권한 있는 행만 조회) or 유저→역할도 캐시. "함수레벨로 1차 거르고 객체레벨은 단건에만". <b>흡수 못 함을 먼저 인정</b>이 핵심.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q1-12. 토큰 RBAC 캐시 10분 — "즉시 무효화(0초)"라는데 SHA-256 키라 역추적 되나? <span style="color:var(--critical);font-size:12px;">(논리 모순)</span></summary><div class="body"><div class="why"><b>왜:</b> Result "즉시 0초" ↔ 토큰 캐시 10분 충돌. 면접관이 정확히 찌름.</div><div class="key"><b>핵심:</b> <code>permissionByRole</code>(1분)은 <code>@CacheEvict</code>로 즉시. 단 <strong>토큰 캐시(10분, SHA-256 키)는 역추적 불가 → "유저→토큰해시 역인덱스(Redis Set)"로 함께 evict</strong>해야 "0초"가 참. 없으면 최대 10분 stale → <strong>JTI 블랙리스트 교차 체크</strong>로 보강. "캐시는 성능, 블랙리스트는 보안 — 보안 우선." (역인덱스 유무 본인 확인)</div></div></details>
+    <details class="qa"><summary>Q1-13. 응답 PII 마스킹을 진입점 인가가 아닌 AOP(@MaskIfNoPermission)로 한 이유? <span style="color:var(--good);font-size:12px;">(실제 코드)</span></summary><div class="body"><div class="why"><b>왜:</b> "인가는 진입점에서 끝"이라는 통념을 넘는지.</div><div class="key"><b>핵심:</b> 진입점은 "API 호출 가능?"만 — 응답 본문 필드(전화번호)는 통과. 권한 없는 운영자에게도 목록은 보이되 PII만 <code>010-****-5678</code>로 가리려면 응답 직렬화 시점 <code>DtoMaskingAspect</code> 필드 마스킹. <strong>인가를 다층(진입점+응답)으로.</strong></div></div></details>
+    <details class="qa"><summary>Q1-16. (트렌드) 토큰 탈취 후 다른 클라이언트 재사용 방어는? DPoP 고려했나?</summary><div class="body"><div class="why"><b>왜:</b> RFC 9700이 sender-constraining(mTLS/DPoP) 권고. bearer 한계.</div><div class="key"><b>핵심:</b> 현재 bearer면 "DPoP 미적용, bearer+RTR+JTI 블랙리스트 조합으로 방어" 명시적 포지셔닝. DPoP(proof-of-possession) 설명 가능하면 가점.</div></div></details>
+
+    <div class="domain-head dh2">2. 관측성 (OpenTelemetry / SigNoz)</div>
+    <details class="qa"><summary><span class="fire">🔥</span> Q2-1. OTel Agent와 @WithSpan SDK 동시 사용 시 GlobalOpenTelemetry 중복 초기화는?</summary><div class="body"><div class="why"><b>왜:</b> 이력서에 "주의사항"으로 적음 → 실제 겪었는지 검증.</div><div class="key"><b>핵심:</b> Agent가 부트스트랩에서 이미 초기화 → SDK 재초기화 시 <code>IllegalStateException</code>. <b>정답은 SDK 초기화 코드를 아예 안 쓰는 것.</b> <code>@WithSpan</code>/tracer는 Agent가 만든 인스턴스 자동 사용.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q2-2. P95 알람 임계값을 어떻게 정했나? SLO와 어떻게 연결되나?</summary><div class="body"><div class="why"><b>왜:</b> 임의 숫자 vs SLO 역산은 SRE 성숙도의 결정적 차이. (SLO 부재 = Critical)</div><div class="key"><b>핵심:</b> SLI(P95) → SLO(P95&lt;1000ms, 30일 99%) → 알람은 SLO 위반 전 조기경고(burn rate). 안 했으면 솔직히 + "에러버짓 기반으로 발전시키고 싶다". RED 메서드 언급하면 깊이.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q2-3. OTel Collector가 다운되면 애플리케이션에 무슨 일이? 어떻게 방어했나?</summary><div class="body"><div class="why"><b>왜:</b> 관측성이 서비스 critical path에 있으면 안 됨.</div><div class="key"><b>핵심:</b> OTLP exporter 비동기 queue+retry. <code>BatchSpanProcessor</code> maxQueueSize·exporterTimeout으로 블로킹 방지. <code>OTEL_EXPORTER_OTLP_TIMEOUT</code> 짧게(5초). telemetry 유실되나 서비스 영향 없음 = "관측성 다운 ≠ 서비스 다운"의 실제 구현.</div></div></details>
+    <details class="qa"><summary>Q2-4. 커스텀 span attribute에 userId/orderId 같은 고카디널리티 값 썼나? ClickHouse 문제는?</summary><div class="body"><div class="why"><b>왜:</b> 카디널리티 폭증 = ClickHouse 디스크/쿼리 성능 최대 위협.</div><div class="key"><b>핵심:</b> 고카디널리티는 span event/로그에. attribute는 enum 수준(<code>order.status</code>)으로 제한. Collector <code>filter processor</code>로 인제스트 전 제거.</div></div></details>
+    <details class="qa"><summary>Q2-5. 샘플링 전략 — head-based vs tail-based? 무엇을 썼나?</summary><div class="body"><div class="why"><b>왜:</b> 이력서 "샘플링=[실제 구성]" 미완성.</div><div class="key"><b>핵심:</b> SigNoz 기본=head-based 100%. head 한계(에러/slow trace 놓침). tail은 Collector 버퍼링·메모리 부담. 소규모는 100% 수집+TTL 관리 합리적. 트래픽 증가 시 tail 전환 경로.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q2-8. 로그 grep만 하다가 SigNoz로 실제 해결한 장애 사례 하나?</summary><div class="body"><div class="why"><b>왜:</b> 도구 도입보다 도구로 문제 해결한 경험. 수치 없는 이력서에서 최다 파고듦.</div><div class="key"><b>핵심:</b> 구체 내러티브 — "카카오 OAuth 콜백 간헐 5초 지연 → trace에서 JWKS 외부호출 span 4.8초 + MDC 로그로 cache miss 직후 재조회 확인 → TTL 조정." flamegraph에서 뭘 보고 뭘 결론냈는지.</div></div></details>
+
+    <div class="domain-head dh3">3. 도메인 설계 + DB 성능</div>
+    <details class="qa"><summary><span class="fire">🔥</span> Q3-1. N+1이 실제 발생한 걸 어떻게 진단했나?</summary><div class="body"><div class="why"><b>왜:</b> 코드 리뷰 추측 vs APM/로그 실측의 수준 차이.</div><div class="key"><b>핵심:</b> SigNoz 트레이스에서 단일 요청 DB span 수 비정상(목록 20건에 쿼리 21개) + <code>show_sql</code> + EXPLAIN ANALYZE로 인덱스 미사용 확인.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q3-2. Fetch Join과 @BatchSize 중 언제 뭘 쓰나? STAR 3엔 뭘 적용했나?</summary><div class="body"><div class="why"><b>왜:</b> 상호 대체 아님. 차이 모르는 경우 많음.</div><div class="key"><b>핵심:</b> Fetch Join=단건 상세, 페이지네이션 없을 때. @BatchSize=목록(Pageable)/컬렉션 클 때. <span class="hl">목록에 Pageable 있으면 Fetch Join 단독은 HHH90003004 경고</span> → @BatchSize/DTO projection.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q3-3. Fetch Join에 Pageable 붙이면 무슨 일이?</summary><div class="body"><div class="why"><b>왜:</b> 이 함정을 아는지로 즉각 수준 판별.</div><div class="key"><b>핵심:</b> Hibernate가 SQL LIMIT 못 쓰고 <b>전체 결과를 메모리에 올린 뒤 애플리케이션에서 자름</b>(HHH90003004) → OOM. 해결: 목록 @BatchSize/DTO+별도 count, 상세 Fetch Join.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q3-4. 복합 인덱스 컬럼 순서를 어떻게 정했나? 저카디널리티 컬럼을 넣은 이유는?</summary><div class="body"><div class="why"><b>왜:</b> 컬럼 순서가 플래너의 인덱스 사용 결정 핵심.</div><div class="key"><b>핵심:</b> 등치(=) 필터 앞, 범위(BETWEEN) 뒤. 저카디널리티라도 항상 WHERE 포함+고카디널리티와 결합하면 선두 가능(예: <code>(franchisor_id, content_type, created_at DESC)</code>). MySQL은 선두 컬럼 매칭 원칙 절대적.</div></div></details>
+    <details class="qa"><summary>Q3-6. 3종 컨텐츠(Notice/Agreement/Document)를 어떻게 테이블 모델링했나?</summary><div class="body"><div class="why"><b>왜:</b> 공통 라이프사이클 다형 엔티티 모델링 = JPA 실무 검증 전형.</div><div class="key"><b>핵심:</b> STI(단일테이블)=null 많으나 조인 없어 조회 빠름(목록 중심이면 합리). 조인테이블=정규화 좋으나 조인 비용. "어떤 걸 골랐고 왜 쿼리 패턴에 맞는지".</div></div></details>
+
+    <div class="domain-head dh4">4. 결제·빌링</div>
+    <details class="qa"><summary><span class="fire">🔥</span> Q4-1. (memberId, billingDate) 유니크 제약 — 두 스레드 동시 INSERT면?</summary><div class="body"><div class="why"><b>왜:</b> 유니크 제약은 race를 막는 게 아니라 한쪽에 에러를 줌. 예외처리가 멱등성 완성.</div><div class="key"><b>핵심:</b> 위반 시 <code>DataIntegrityViolationException</code>/<code>DuplicateKeyException</code> → catch → "이미 처리됨" skip. 또는 <code>INSERT ... ON CONFLICT DO NOTHING</code>. (이력서에 이 한 줄 추가 필요)</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q4-2. 결제 일배치가 PG 성공 후 DB 저장 실패(partial failure)면 멱등성은?</summary><div class="body"><div class="why"><b>왜:</b> DB 유니크는 이 케이스 못 막음. 인지 여부 테스트.</div><div class="key"><b>핵심:</b> 토스 빌링 API에 <code>Idempotency-Key</code> 헤더로 (memberId+billingDate) 키 전달 → 동일 키 재호출 시 PG가 중복 차단+이전 결과 반환. <b>DB 유니크 + PG idempotency 이중 방어.</b></div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q4-3. 멀티 인스턴스에서 일배치가 두 인스턴스 동시 실행되면?</summary><div class="body"><div class="why"><b>왜:</b> Spring Scheduler 단독 = 인스턴스마다 실행. DB 유니크만으론 동시 PG 호출 못 막음.</div><div class="key"><b>핵심:</b> 방어1=DB 유니크. 방어2=토스 Idempotency-Key. 근본=<b>ShedLock</b> <code>@SchedulerLock</code>(lockAtMostFor=deadlock 방지, lockAtLeastFor=조기 재실행 방지). "현재 단일이면 인지하고 ShedLock 도입 고려" 정직하게.</div></div></details>
+    <details class="qa"><summary>Q4-4. 유니크 제약 vs 비관적 락 — 결제 배치에 왜 유니크 제약을?</summary><div class="body"><div class="why"><b>왜:</b> 중복 방지 여러 패턴 중 선택 근거.</div><div class="key"><b>핵심:</b> 비관적 락=락 대기·커넥션 hold·deadlock 위험. 유니크 제약=DB 원자 보장, retry-safe, 단방향 INSERT 적합. 일배치는 충돌 빈도 낮고 재실행 안전성 중요 → 유니크 제약.</div></div></details>
+    <details class="qa"><summary>Q4-6. 토스 Webhook(결제 이벤트) 위조 방지는?</summary><div class="body"><div class="why"><b>왜:</b> webhook 위조 = 실제 청구 없이 멤버십 활성화. 결제 핵심 공격벡터.</div><div class="key"><b>핵심:</b> 토스 제공 서명(HMAC-SHA256)으로 바디 검증, 불일치 즉시 거부 + 토스 IP 화이트리스트. 미적용이면 "개선 계획 있다" 정직하게.</div></div></details>
+    <details class="qa"><summary>Q4-8. 무료체험 중 빌링키 등록 후 종료 직전 삭제로 결제 회피 가능한가?</summary><div class="body"><div class="why"><b>왜:</b> 비즈니스 로직 취약점(OWASP Business Logic).</div><div class="key"><b>핵심:</b> 자동전환 시점 빌링키 존재 사전검증, 없으면 결제 없이 <code>cancelled</code>. "종료 N일 전 결제수단 등록 필수 알림 + 없으면 자동 해지" 정책으로 UX+보안 동시.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q4-9. 추천인 리워드 멱등 지급을 어떻게? <span style="color:var(--good);font-size:12px;">(실코드 정정)</span></summary><div class="body"><div class="why"><b>왜:</b> 돈이 걸린 "정확히 1회"를 분산락 없이.</div><div class="key"><b>핵심(정정):</b> <s>(memberId, rewardDate) 유니크</s>가 아니라 <strong>조건부 <code>UPDATE ... SET GRANTED WHERE status=PENDING</code>의 row count로 선점 → 같은 트랜잭션에서 발급</strong>. 동시 배치 2개면 진 쪽 row 0 → skip. 외부 분산락·outbox 불필요. PK = (membershipId, promotionId), 1딜=1리워드.</div></div></details>
+    <details class="qa"><summary>Q4-10. 리워드 D+8 기준과 환불 처리는? <span style="color:var(--good);font-size:12px;">(실코드)</span></summary><div class="body"><div class="why"><b>왜:</b> 결제·리워드 엣지 케이스를 정책 수준에서.</div><div class="key"><b>핵심:</b> D+8 = 첫 결제 + 8일(전액환불 가능기간 종료) + 1h. <strong>D+8 이내 환불이면 배치 지급 제외</strong>(<code>MIN(paidAt)</code> 기준). <strong>지급 후 환수(클로백) 미구현 = 백로그로 인지</strong>. "버그 아니라 범위 결정"으로 답.</div></div></details>
+    <details class="qa"><summary><span class="fire">🔥</span> Q4-11. 추천코드 셀프추천·가짜 피추천인 자가파밍(Sybil)은? <span style="color:var(--good);font-size:12px;">(실코드)</span></summary><div class="body"><div class="why"><b>왜:</b> 그로스 루프 = 어뷰징 루프.</div><div class="key"><b>핵심:</b> 자기추천 차단(userId), 추천 쿨다운 <strong>999개월(생애1회)</strong>, 키=(사업자번호,종사업자번호,plan) NULL-safe. <strong>B2B 사업자번호 유니크가 구조적 방어.</strong> ⚠️ 잔존: 다른 사업자번호 shell 자가소비+D+8후 환불 → fraud 휴리스틱+클로백. <strong>블랭킷 캡은 정상 파워추천인 훼손이라 정답 아님.</strong></div></div></details>
+    <details class="qa"><summary>Q4-12. 환불 자체의 멱등성(이중 환불)은? <span style="color:var(--warning);font-size:12px;">(논리 비대칭)</span></summary><div class="body"><div class="why"><b>왜:</b> 결제는 유니크로 막았는데 환불은? 더블클릭=금전 손실.</div><div class="key"><b>핵심:</b> 환불도 <strong>토스 Idempotency-Key + DB측 <code>paymentKey당 누적환불액 ≤ 결제액</code> 불변식을 비관락 검증</strong>. 부분환불 history가 단일 진실 원천. "결제 멱등성과 대칭"이 정답.</div></div></details>
+    <details class="qa"><summary>Q4-13. 정액 할인이 정가를 초과하면? <span style="color:var(--good);font-size:12px;">(실코드)</span></summary><div class="body"><div class="why"><b>왜:</b> 결제 금액 경계 처리 디테일.</div><div class="key"><b>핵심:</b> 음수 방지 <strong>0원 클램프</strong> — 1원 아님(PG가 1원 결제를 거부하므로 0원). 무료 처리 흐름과 정합.</div></div></details>
+
+    <div class="domain-head dh5">5. 아키텍처 공통 (시니어 판별)</div>
+    <details class="qa"><summary>Q5-1. "비동기 재시도 큐"가 알림톡·ERP·Deauth 3곳에 등장 — 같은 구현체? 별도?</summary><div class="body"><div class="why"><b>왜:</b> 횡단 관심사 공통화 설계 능력. 시니어는 반복 패턴 인식.</div><div class="key"><b>핵심:</b> 별도면 "중복 인식했으나 범위 달라 개별 구현, 공통 모듈화는 다음 단계." 공통화면 "RetryQueue 도메인 서비스+어댑터별 주입." "얼마나 했나"보다 "반복을 봤을 때 반응".</div></div></details>
+    <details class="qa"><summary>Q5-2. 상태 전이 guard 로직은 서비스 if문인가 도메인 객체 내부인가?</summary><div class="body"><div class="why"><b>왜:</b> 서비스 if = 빈혈 도메인 모델. 시니어가 차이 인식하는지.</div><div class="key"><b>핵심:</b> enum <code>transitionTo(next)</code>/<code>allowedTransitions()</code>로 도메인 레이어 차단이 이상적. 서비스 if면 "전이 단순해 선택, 복잡해지면 Spring State Machine 고려" 근거.</div></div></details>
+    <details class="qa"><summary>Q5-3. 멤버십 해지예약 상태에서 권한(canOrder) 회수 시점은? (STAR1↔STAR4 연결)</summary><div class="body"><div class="why"><b>왜:</b> 상태머신과 권한 모델 결합 지점을 설계한 사람만 정확히 답함.</div><div class="key"><b>핵심:</b> 해지예약=이미 결제한 기간이라 권한 유지, 실제 cancelled 전환 시 회수. 회수=JTI 블랙리스트(즉시) vs 만료(1h) 중 무엇·왜. "연체→자동해지 시 즉시 회수=JTI 블랙리스트"와 연결.</div></div></details>
+    <details class="qa"><summary>Q5-4. 트래픽 10배면 이 아키텍처에서 먼저 병목 되는 곳은?</summary><div class="body"><div class="why"><b>왜:</b> 현재 규모엔 맞다 인정하면서 한계를 아는지(종합 질문).</div><div class="key"><b>핵심:</b> SigNoz EC2 단독→ClickHouse 쓰기·디스크. Redis 단일→ElastiCache 클러스터/Read Replica. Scheduler 배치→처리시간이 다음 배치 전 미완료(Spring Batch 청크/파티셔닝). 확장 경로 명확히.</div></div></details>
+
+    <div class="note" style="margin-top:24px;">📌 <strong>모의면접 추천 순서</strong>: <span class="fire">🔥</span> 표시부터. 특히 Q2-2(SLO), Q3-1~3(N+1), Q4-1~3(멱등성/멀티인스턴스)은 답변을 글로 써보고 입으로 1번 말해볼 것. "모르면 정직하게 + 향후 방향 제시"가 시니어 면접의 안전한 패턴.</div>
+  </div>
+
+  <footer>전문가 패널 5인 (백엔드 아키텍트 · AppSec · DB 성능 · SRE · 클라우드 아키텍트) · 2026-05-31<br>원본: expert-review-2026-05-31.md · tech-study-resources.md · interview-questions-by-tech.md</footer>
+</div>
+
+<script>
+  document.querySelectorAll('.tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+      document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.tab).classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+</script>
+</body>
+</html>
