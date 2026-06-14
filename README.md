@@ -50,7 +50,8 @@ resume/
 ```
 
 ### interview/ — 면접 준비
-- [`questions-by-tech.md`](interview/questions-by-tech.md) — 기술별 예상 질문 + 답변 포인트
+- [`questions-by-project.md`](interview/questions-by-project.md) — **프로젝트별 예상 질문** (머스트잇·SFN 직전경력 위주, 2026 트렌드 반영)
+- [`questions-by-tech.md`](interview/questions-by-tech.md) — 기술 개념별 예상 질문 + 답변 포인트
 - [`ai-trend-notes.md`](interview/ai-trend-notes.md) — AI 시대 기술면접 트렌드 + 답변 스크립트
 - [`ai-practice-guide.md`](interview/ai-practice-guide.md) — AI 활용 면접 대응 연습 가이드
 - [`star4-membership-notes.md`](interview/star4-membership-notes.md) — 멤버십 추천인 시스템 면접 노트
