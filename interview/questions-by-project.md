@@ -116,7 +116,31 @@
 
 ---
 
-## 6. 공통 — 행동/시니어십/AI (2026 가중 ↑)
+## 6. 개인 프로젝트 — Alpha Foundry (AI 퀀트 분석 플랫폼) ⭐ AI시대 차별화
+
+> 2026 면접에서 **LLM/AI 통합·운영 경험은 가점**. 포트폴리오: github.com/lian220/quant-jump-stock-portfolio. 1인 풀스택(Spring Boot/Kotlin + FastAPI/Python + Next.js, GCP Cloud Run).
+
+**Q. AI 추천 점수 모델을 어떻게 설계했고 신뢰성은 어떻게 담보했나?**
+- *답변*: 운영 데이터에서 점수 산식 결함 6종(만점 불가·이중 스케일 버그 등) 발견 → **ADR로 근거화 후 0~100 정규화 가중합으로 재설계**. `scoring_spec.yaml` **단일 SSoT**로 Python(Data Engine)↔Kotlin(Core) 산식 드리프트 0. 462표본 percentile 등급 재보정 + golden CSV·property test로 회귀 검증(pytest 200).
+
+**Q. ML/AI 예측의 환각·오류는 어떻게 방어했나? (2026 핵심)**
+- *답변*: Vertex AI 예측을 그대로 노출하지 않고 **가드 다층화** — 음수 예측 차단(Negative AI Veto), VIX 거시 게이트(시장 변동성 과다 시 추천 전체 차단), 결측 축은 0점 대신 weight 재정규화. **XAI(축별 기여도)**로 "왜 이 점수인지" 설명 가능하게.
+
+**Q. 1인 프로젝트인데 왜 4개 마이크로서비스? 모놀리스가 낫지 않나?**
+- *답변*: 트레이드오프 인지함. Core(Kotlin/Spring), Data/ML(Python/FastAPI — ML 생태계), FE/BO(Next.js)로 **언어·생태계가 갈려** 분리가 자연스러웠고, 운영 부담은 **Cloud Run 동일 배포 모델 + Pub/Sub**로 최소화. 규모가 더 작았다면 모놀리스가 맞았을 것.
+
+**Q. 월 운영비 $30 → $5는 어떻게?**
+- *답변*: Kafka→Pub/Sub, Quartz→Cloud Scheduler, GCE VM→**Cloud Run(scale-to-zero)** 전환. 사용량 과금 + 유휴 시 0. 각 결정을 ADR(0001/0003/0004)로 기록.
+
+**Q. 운영 장애 경험은?**
+- *답변*: MongoDB connection pool stale로 추천 마비 → **fail-fast**(prod 환경변수 누락 시 부팅 차단)로 "조용한 localhost fallback" 차단 + 운영 규칙 R1~R9 + Cloud Monitoring 알림 체계화.
+
+**Q. (확장·agentic) 이 추천 시스템에 LLM 에이전트를 넣는다면?**
+- *답변*: 종목 분석을 **에이전트화** — 뉴스·재무·기술지표를 tool로 두고 LLM이 단계적 조회·종합(**agentic RAG**). 단 **수치는 결정론적 계산 유지**, LLM은 설명·요약에만. **eval(golden set + LLM-as-judge)**로 회귀 감지. → 이 답이 AI 에이전트 라운드로 자연스럽게 연결됨 ([`questions-by-trend.md`](questions-by-trend.md) B 참고).
+
+---
+
+## 7. 공통 — 행동/시니어십/AI (2026 가중 ↑)
 
 **Q. (SOAR) 가장 어려웠던 의사결정과 그때의 갈등 상황은?**
 - *포인트*: "강점만 나열" 금지 — 트레이드오프를 감수한 결정 1개(예: 게이트웨이 중앙집행의 SPOF 리스크 vs 단순성)를 Obstacle 중심으로.

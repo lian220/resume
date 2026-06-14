@@ -50,7 +50,8 @@ resume/
 ```
 
 ### interview/ — 면접 준비
-- [`questions-by-project.md`](interview/questions-by-project.md) — **프로젝트별 예상 질문** (머스트잇·SFN 직전경력 위주, 2026 트렌드 반영)
+- [`questions-by-project.md`](interview/questions-by-project.md) — **프로젝트별 질문** (SFN·머스트잇·Alpha Foundry 경험별, 답변 포인트)
+- [`questions-by-trend.md`](interview/questions-by-trend.md) — **최신 트렌드·7년차 시니어·기본지식·AI 에이전트** 질문 (2026)
 - [`questions-by-tech.md`](interview/questions-by-tech.md) — 기술 개념별 예상 질문 + 답변 포인트
 - [`ai-trend-notes.md`](interview/ai-trend-notes.md) — AI 시대 기술면접 트렌드 + 답변 스크립트
 - [`ai-practice-guide.md`](interview/ai-practice-guide.md) — AI 활용 면접 대응 연습 가이드
