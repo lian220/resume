@@ -10,7 +10,7 @@ export const profile = {
   name: "임도영",
   en: "Lian",
   title: "백엔드 시니어 엔지니어",
-  yearsExp: "6년 차",
+  yearsExp: "7년 차",
   email: "lian.dy220@gmail.com",
   phone: "+82 10-9936-1312",
   github: "github.com/lian220",
@@ -19,10 +19,10 @@ export const profile = {
   positioning: "백엔드 시니어 · 인증/인가 · 결제(빌링) · 관측성 ｜ Spring Boot · Kotlin · AWS",
   // 숫자 후킹형 (star/paar/summary 상단)
   introHook:
-    '소셜 로그인으로 신규 가입을 <b>일 10명 → 150명(15배)</b>으로 늘리고, <b>결제·환불·리워드 회귀 0건</b>의 멤버십 빌링을 BE 단독 설계한 <b>6년 차 백엔드 엔지니어</b>. 구현보다 <b>"왜 이 설계를 골랐나(트레이드오프)"</b>를 드러내고, 관측성·장애 대응으로 운영 안정성을 끝까지 책임집니다.',
+    '소셜 로그인으로 신규 가입을 <b>일 10명 → 150명(15배)</b>으로 늘리고, <b>결제·환불·리워드 회귀 0건</b>의 멤버십 빌링을 BE 단독 설계한 <b>7년 차 백엔드 엔지니어</b>. 구현보다 <b>"왜 이 설계를 골랐나(트레이드오프)"</b>를 드러내고, 관측성·장애 대응으로 운영 안정성을 끝까지 책임집니다.',
   // 시간순(career) 자기소개 (문단형)
   introLong: [
-    "<b>6년 차 백엔드 개발자 임도영입니다.</b> Java·Kotlin과 Spring 기반으로 커머스·핀테크·프랜차이즈 SaaS 도메인에서 웹서비스를 개발해왔습니다. 현재 <b>스마트푸드네트웍스</b>에서 B2B 식자재 이커머스(차별화상회)와 프랜차이즈 본부-점주 SaaS(외식UP ROS)의 <b>인증·인가, 결제(빌링), 신규 도메인 구축</b>을 풀스택으로 주도하고 있습니다.",
+    "<b>7년 차 백엔드 개발자 임도영입니다.</b> Java·Kotlin과 Spring 기반으로 커머스·핀테크·프랜차이즈 SaaS 도메인에서 웹서비스를 개발해왔습니다. 현재 <b>스마트푸드네트웍스</b>에서 B2B 식자재 이커머스(차별화상회)와 프랜차이즈 본부-점주 SaaS(외식UP ROS)의 <b>인증·인가, 결제(빌링), 신규 도메인 구축</b>을 풀스택으로 주도하고 있습니다.",
     "설계 의사결정과 트레이드오프를 명확히 남기고, 반복 작업을 자동화하며, <b>운영 안정성(관측성·장애 대응)을 끝까지 책임지는 것</b>을 중요하게 생각합니다. 실제로 팀 관측성 표준이 없던 상황에서 OpenTelemetry 기반 SigNoz를 직접 제안·도입해 팀 표준으로 정착시켰습니다.",
     "또한 LLM 기반 생성형 AI 서비스에도 관심을 두고, 개인 프로젝트로 AI 퀀트 분석 플랫폼(<b>Alpha Foundry</b>)을 1인 풀스택으로 구축·운영하고 있습니다.",
   ],
@@ -200,6 +200,6 @@ export const certs = [
   { name: "정보처리기사", date: "2019.08", org: "한국산업인력공단" },
   { name: "조경기사", date: "2016.12", org: "한국산업인력공단" },
 ];
-export const careerTotal = "약 6년"; // [확인: 총 개월 수]
+export const careerTotal = "7년 차 · 약 6년 3개월"; // 공백(2023.04~10) 제외 환산. SFN 정확 입사월 확정 시 재계산
 
 export default { profile, skills, skillChips, experiences, career, education, certs, careerTotal };

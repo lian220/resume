@@ -172,7 +172,7 @@ ${projects}`;
   <ul class="flat">
     ${projOverview}
   </ul>
-  <h2 class="sec">경력 <span class="yr">${careerTotal} <span class="todo">[확인: 총 개월 수]</span></span></h2>
+  <h2 class="sec">경력 <span class="yr">${careerTotal}</span></h2>
 ${career.map(companyBlock).join("\n")}
   <h2 class="sec">학력</h2>
   <p class="edu"><b>${education.school}</b> <span class="pd">${education.period} ｜ ${education.major}</span></p>
