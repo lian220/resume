@@ -140,8 +140,7 @@ export const career = [
   {
     company: "주식회사 스마트푸드네트웍스",
     logo: "SFN",
-    period: "2025.05 - 재직 중",
-    periodTodo: "정확 입사 연월",
+    period: "2025.05 - 재직 중 (1년 1개월)",
     role: "백엔드 시니어",
     note: "차별화상회 · 외식UP ROS",
     isCurrent: true,
