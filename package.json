@@ -1,0 +1,10 @@
+{
+  "name": "lian-resume",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "임도영(Lian) 이력서 — base/resume-data.mjs 단일 소스에서 4개 포맷 생성",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  }
+}
