@@ -12,7 +12,7 @@
 |---|---|---|---|
 | **① 시간순 커리어** | [`resume-career.html`](resume-career.html) | 실제 제출 (원티드/점핏 스타일) | 스마트푸드네트웍스 포함 통합본 |
 | **② STAR** | [`resume-star.md`](resume-star.md) · [`.html`](resume-star.html) | **마스터 원천** (가장 상세) | 모든 파생본의 source-of-truth |
-| **③ PAR** | [`resume-par.md`](resume-par.md) | 문제·의사결정·수치 중심 서술 | P(문제)·A(분석/선택)·R(수치) |
+| **③ PAAR** | [`resume-paar.md`](resume-paar.md) · [`.html`](resume-paar.html) | 문제·의사결정·수치 중심 서술 | P(문제)·A(분석)·A(실행)·R(수치) |
 | **④ 제출용 요약본** | [`resume-summary.md`](resume-summary.md) · [`.html`](resume-summary.html) | 2페이지 압축 제출본 | ⌘P → PDF 저장 |
 
 > **single-source 원칙**: `resume-star.md`가 원천(가장 상세). career / PAR / summary는 여기서 파생한 **뷰**입니다. 수치·사실을 고칠 땐 STAR 마스터부터 갱신 → 파생본 반영. (드리프트 방지)
@@ -28,7 +28,7 @@ resume/
 ├── README.md                  ← 현재 문서 (인덱스)
 ├── resume-career.html         ① 시간순 커리어
 ├── resume-star.md / .html     ② STAR (마스터)
-├── resume-par.md              ③ PAR
+├── resume-paar.md / .html     ③ PAAR
 ├── resume-summary.md / .html  ④ 제출용 요약본
 ├── interview/                 면접 준비
 ├── reference/                 작성법·전략 학습 자료
