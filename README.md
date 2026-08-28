@@ -58,6 +58,7 @@ resume/
 - [`star4-membership-notes.md`](interview/star4-membership-notes.md) — 멤버십 추천인 시스템 면접 노트
 
 ### reference/ — 작성법·전략 학습
+- [`backend-resume-proof-ai-era.md`](reference/backend-resume-proof-ai-era.md) — AI 시대 백엔드 실력 증명 공식: 핵심 기술 × 문제 소재 × 검증 증거
 - [`par-writing-guide.md`](reference/par-writing-guide.md) — PAR 구조 이력서 작성법 (영상 요약)
 - [`portfolio-topic-strategy.md`](reference/portfolio-topic-strategy.md) — 포트폴리오 주제 선정 전략
 - [`portfolio-apply-check.md`](reference/portfolio-apply-check.md) — 전략 → 실제 프로젝트 적용 체크
